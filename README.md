@@ -28,37 +28,41 @@ This creates per-file symlinks from this repo into `~/.claude/skills/`, `~/.clau
 
 The "house rules" — synthesized cross-build conventions with explicit decision criteria where the kit doesn't lock a single answer.
 
-| Skill | Domain | Status |
-|---|---|---|
-| `factory-stack.md` | Locked + flexible stack decisions, decision criteria | Phase A |
-| `factory-frontend.md` | DataTable + drawer-CRUD, RowActions, formatters, Mantine vs shadcn | Phase A |
-| `factory-data-pipelines.md` | CSV imports, time-series envelopes, Python service entry points | Phase A |
-| `factory-llm-workflows.md` | LangGraph TypedDict state, node factories, RAG, SSE streaming | Phase A |
-| `factory-security.md` | KMS-at-rest, BAA/PHI, safe redirects, AI-code risk | Phase A |
-| `factory-pitfalls.md` | Anti-patterns digest indexed across all domains | Phase A |
-| `factory-auth.md` | Better Auth + orgs primary, RLS/Clerk criteria, wrapper interface | Phase B |
-| `factory-data-layer.md` | Drizzle schema partitioning, multi-tenancy keys, timestamps helper | Phase B |
-| `factory-forms.md` | react-hook-form + Zod variants, field registry, masked inputs | Phase B |
-| `factory-api.md` | Server actions vs tRPC criteria; validation; error shape | Phase B |
-| `factory-observability.md` | PostHog + Sentry day 1, activity logging, trace IDs | Phase B |
-| `factory-deployment.md` | Vercel + Cloud Run + Terraform conventions | Phase B |
+| Skill | Domain |
+|---|---|
+| `factory-stack.md` | Locked + flexible stack decisions, decision criteria |
+| `factory-frontend.md` | DataTable + drawer-CRUD, RowActions, formatters, Mantine vs shadcn |
+| `factory-auth.md` | Better Auth + orgs primary, RLS/Clerk criteria, wrapper interface |
+| `factory-data-layer.md` | Drizzle schema partitioning, multi-tenancy keys, timestamps helper |
+| `factory-forms.md` | react-hook-form + Zod variants, field registry, masked inputs |
+| `factory-api.md` | Server actions vs tRPC criteria; validation; error shape |
+| `factory-data-pipelines.md` | CSV imports, time-series envelopes, Python service entry points |
+| `factory-llm-workflows.md` | LangGraph TypedDict state, node factories, RAG, SSE streaming |
+| `factory-security.md` | KMS-at-rest, BAA/PHI, safe redirects, AI-code risk |
+| `factory-observability.md` | PostHog + Sentry day 1, activity logging, trace IDs |
+| `factory-deployment.md` | Vercel + Cloud Run + Terraform conventions |
+| `factory-pitfalls.md` | Anti-patterns digest indexed across all domains; usable as PR checklist |
 
 ### Agents (specialist subagents)
 
 Each is a Claude Code subagent file (YAML frontmatter + markdown body) modeled on the kairos `frontend-design` agent. Curated tool list, single model choice.
 
-| Agent | When to invoke | Status |
-|---|---|---|
-| `frontend-engineer` | UI scaffolding, CRUD surfaces, component-library decisions | Phase A |
-| `data-pipeline-engineer` | CSV ingestion, Python services, simulation envelopes | Phase A |
-| `llm-workflow-engineer` | LangGraph workflows, RAG, structured output, streaming | Phase A |
-| `security-engineer` | Threat-model a feature, audit AI-generated code, sensitive-data handling | Phase A |
-| `feature-architect` | Scope a vague client ask into a buildable feature spec | Phase A |
-| `db-schema-architect` | Drizzle schemas, migrations, multi-tenancy | Phase B |
-| `auth-wiring-specialist` | Better Auth + orgs setup, RBAC, session handling | Phase B |
-| `forms-builder` | Multi-step forms, field registry, conditional visibility | Phase B |
-| `api-route-engineer` | Routes, validation, error responses, pagination | Phase B |
-| `code-reviewer` | Style enforcement + pitfalls digest as review checklist | Phase B |
+| Agent | When to invoke |
+|---|---|
+| `feature-architect` | Scope a vague client ask into a buildable feature spec; routes to the right specialists |
+| `frontend-engineer` | UI scaffolding, CRUD surfaces, component-library decisions |
+| `db-schema-architect` | Drizzle schemas, migrations, multi-tenancy keys |
+| `auth-wiring-specialist` | Auth provider setup, RBAC, org context |
+| `forms-builder` | Multi-step forms, field registry, conditional visibility |
+| `api-route-engineer` | Endpoints, validation, error responses, pagination |
+| `data-pipeline-engineer` | CSV ingestion, Python services, simulation envelopes |
+| `llm-workflow-engineer` | LangGraph workflows, RAG, structured output, streaming |
+| `security-engineer` | Threat-model a feature, audit AI-generated code, sensitive-data handling |
+| `code-reviewer` | PR review against `factory-pitfalls.md` checklist |
+
+### User-level `CLAUDE.md`
+
+A short header (`~/.claude/CLAUDE.md` ← symlinked to `factory-kit/CLAUDE.md`) lists the skill + agent rosters so they're visible to Claude Code on every project. Per-project decisions still live in each project's own `CLAUDE.md` or `DECISIONS.md`.
 
 ## Versioning
 

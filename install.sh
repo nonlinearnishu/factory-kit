@@ -55,4 +55,39 @@ for subdir in skills agents commands; do
   echo
 done
 
+# Top-level CLAUDE.md — user-level, loaded into every project
+echo "[CLAUDE.md]"
+link_top_level_file() {
+  local name="$1"
+  local src="${KIT_ROOT}/${name}"
+  local dst="${CLAUDE_ROOT}/${name}"
+
+  if [[ ! -f "${src}" ]]; then
+    echo "  miss ${name} (not in kit)"
+    return
+  fi
+
+  if [[ -L "${dst}" ]]; then
+    local current_target
+    current_target="$( readlink "${dst}" )"
+    if [[ "${current_target}" == "${src}" ]]; then
+      echo "  ok   ${name} (already linked)"
+      return
+    fi
+    echo "  relink ${name} (was -> ${current_target})"
+    ln -sfn "${src}" "${dst}"
+    return
+  fi
+
+  if [[ -e "${dst}" ]]; then
+    echo "  skip ${name} (file exists at destination, not a symlink)"
+    return
+  fi
+
+  ln -s "${src}" "${dst}"
+  echo "  link ${name}"
+}
+link_top_level_file "CLAUDE.md"
+echo
+
 echo "Done. Run Claude Code from any project — skills auto-load, agents callable via Agent tool."
