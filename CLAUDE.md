@@ -34,6 +34,18 @@ Invoke `feature-architect` first. It scopes the request, identifies decisions-ne
 - **security-engineer** — threat modeling, AI-code review, sensitive-data handling
 - **code-reviewer** — PR review against factory-pitfalls digest
 
+## Slash commands (auto-loaded into `~/.claude/commands/`)
+
+Linear ticket workflow — universal, project-agnostic. Each project that wants these needs `.claude/linear.json` (run `/setup-linear` once to create it).
+
+- **/setup-linear** — bootstrap `.claude/linear.json` (team, optional project, state names)
+- **/standup** — dev standup view: in-progress / in-review / top priority / backlog
+- **/entry `<issue>`** — load a Linear issue into context and enter plan mode
+- **/submit `[issue]`** — move ticket to "In Review" (auto-detects from branch if no arg)
+- **/close `[issue]`** — closing comment + move to Done + delete local branch / exit worktree
+
+Branch convention assumed by `/submit` and `/close`: any branch containing `<teamkey>-<num>` (case-insensitive) — e.g., `nishu/non-45-topic` → `NON-45`.
+
 ## Per-project decisions
 
 Each new project should have a `DECISIONS.md` (or short section in its `CLAUDE.md`) declaring its picks from `factory-stack.md`'s decision-criteria choices: component library (Mantine vs shadcn), API style (server actions vs tRPC), auth provider, ORM, deployment target. Default to the kit's primary recommendation if not stated.
