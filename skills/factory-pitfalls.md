@@ -54,6 +54,7 @@ Each entry: **the anti-pattern → the actual failure → the right move**.
 - **No `DECISIONS.md` per project.** Decision-criteria choices (which auth, which UI lib, which API style) get relitigated each session. **Right move:** every new project starts with a `DECISIONS.md` containing one-line entries per decision-criteria choice from `factory-stack.md`.
 - **Empty `.claude/` or `.agents/` directories.** Implies intent without value. **Right move:** delete empty stubs; if intent matters, write the placeholder explicitly with `TODO:` so future-you knows what was planned.
 - **`AGENTS.md` as a placeholder.** A one-liner about Next.js breaking changes that doesn't actually teach the conventions. **Right move:** if you write an `AGENTS.md` or `CLAUDE.md`, make it load-bearing or delete it.
+- **Commits with no Linear linkage.** Subjects like `"update files"` or `"fix bug"` leave Linear tickets orphan and break the `/submit` and `/close` flows that parse the issue ID. AI-generated commit messages (opencommit, etc.) regress to this when not configured. **Right move:** enforce via the `linear-id-present` rule in `commitlint.config.cjs` + a Husky `commit-msg` hook; configure opencommit's `OCO_PROMPT_MODULE=@commitlint` so the model reads the same rules. See `factory-commits.md`.
 
 ## How to use this skill
 
