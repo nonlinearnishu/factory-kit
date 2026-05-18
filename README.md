@@ -2,13 +2,13 @@
 
 > **Status:** v0.1.0 — Phase 0, actively iterating. Expect renames and breaking changes inside `0.x`. [Releases](https://github.com/nonlinearnishu/factory-kit/releases) are the changelog.
 
-A personal Claude Code "factory" — synthesized cross-build conventions, specialist subagents, and slash commands, installed as symlinks into `~/.claude/`.
+This is the foundation for a "software factory" - Claude skills, agents, and slash commands that are all automatally symlinked into `~/.claude/`. This allows you to pull upon these skills in any repository.
 
 ## Why this exists
 
-After ~six client builds I noticed the same arguments repeating: server actions vs tRPC, Mantine vs shadcn, Better Auth vs Clerk vs Supabase, where the JSONB envelope lives, how to scope a vague client ask. Each project re-decided things I'd already decided. This kit is the synthesized output of those decisions — *how we build*, separated from *what we're building* — wired into Claude Code so every project starts with the same priors.
+This repository is a synthesis of learnings across multiple production builds. In each one, I went through a learning journey to understand how to build a production-ready stack. Over countless hours, I tried to understand when and when not to implement specific components. Now, I've pulled my learnings into a set of skills & agents that I can use whenever I start a new project.
 
-It's also a public record of how I'm iterating on a "software factory." Phase 0 = synthesized skills + agents + a Linear workflow. Phase 1+ = whatever the next month surfaces.
+This is also becoming a public record of how I am iterating towards a "software factory". Over time, as more code gets generated, I believe the differentiating layer will be the architectural decisions that get made during the build. I want to codify as many of these as I can throughout my journey so that I can consistently come back to them. 
 
 ## Layout
 
@@ -34,7 +34,6 @@ git checkout v0.1.0
 git checkout main
 ./install.sh
 ```
-
 `install.sh` is idempotent — re-run after pulling. Existing files at destinations are skipped with a warning; symlinks pointing into this repo are refreshed.
 
 ## What's in here
