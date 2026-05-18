@@ -77,6 +77,14 @@ module.exports = {
     'body-leading-blank': [2, 'always'],
     'footer-leading-blank': [2, 'always'],
 
+    // Adds `release` as a first-class type — used by /release for version-cut commits.
+    // Standard list comes from @commitlint/config-conventional; we extend it.
+    'type-enum': [
+      2,
+      'always',
+      ['build', 'chore', 'ci', 'docs', 'feat', 'fix', 'perf', 'refactor', 'release', 'revert', 'style', 'test'],
+    ],
+
     // Linear ID required in subject or body (custom rule below).
     'linear-id-present': [2, 'always'],
   },
@@ -84,6 +92,8 @@ module.exports = {
     {
       rules: {
         'linear-id-present': (parsed) => {
+          // Release commits roll up many issues — IDs live in the tag annotation, not the subject.
+          if (parsed.type === 'release') return [true];
           const id = /[A-Z][A-Z0-9]+-\d+/;
           const haystack = [parsed.subject, parsed.body, parsed.footer]
             .filter(Boolean)
@@ -125,11 +135,23 @@ oco config set OCO_DESCRIPTION=true  # body needed to hold the magic-word + Line
 
 The model writes the conventional header; you append the `Fixes NON-XX` line if it didn't infer the ID from branch context. (Future enhancement: a pre-commit step that injects the branch's Linear ID into the body automatically.)
 
+## The `release:` type
+
+Release commits use the custom `release:` type (added to `type-enum` above), not `chore(release):`. Reasoning: a release is a first-class category in the changelog, not a chore. The `/release` slash command emits these automatically — you shouldn't be hand-writing them.
+
+```
+✓ release: v0.1.1 — Linear factory setting update
+✓ release: v0.2.0 — drawer-CRUD scaffolding
+```
+
+Release commits are exempt from `linear-id-present` (see the rule body) — the release rolls up many issues, and their IDs live in the tag annotation, not the subject.
+
 ## When the rule doesn't apply
 
 - **The factory-kit itself** — meta-repo, not connected to Linear. Use Conventional Commits but skip the ID requirement. Drop the `linear-id-present` rule from the kit's own `commitlint.config.cjs` (the kit currently doesn't have one — fine).
 - **Drive-by typo fixes during another task** — fold into the parent commit; don't create a separate ID-less commit.
 - **Initial commit / scaffold commits** — exempt; tag with `chore: initial scaffold`.
+- **Release commits** — `release:` type is exempt by the custom rule (see above).
 
 ## Related
 

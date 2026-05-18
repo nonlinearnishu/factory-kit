@@ -58,13 +58,13 @@ You're cutting a new release. The user owns the final word at every gate, and ed
 
    Wait for the user's reply. On `cancel`, delete the temp file and stop.
 
-8. **Read back what they saved.** Use the `Read` tool on the temp file. Print a brief diff summary (or just the final content if the diff would be longer than the file). Ask one final confirmation:
+8. **Read back what they saved.** Use the `Read` tool on the temp file. Print a brief diff summary (or just the final content if the diff would be longer than the file). Extract the **Outcome** line's summary fragment (the text after `— `) to use as the commit subject. Ask one final confirmation:
    > Final notes shown above. Confirm to write the commit + tag, or reply with another round of edits and I'll wait again.
 
 9. **Gate 2 — write.** On confirmation:
    - Write the new version to `VERSION` (only if the file existed before).
    - `git add VERSION` (only if applicable).
-   - `git commit -m "chore(release): v<new-version>"`.
+   - `git commit -m "release: v<new-version> — <outcome-summary>"` — the summary comes from the **Outcome** line in the notes. Keep the full header ≤ 72 chars (truncate the summary if needed, full text is in the tag annotation).
    - `git tag -a v<new-version> -F /tmp/factory-kit-release-notes-v<new-version>.md` — pass the file directly so multi-line formatting is preserved.
 
 10. **Gate 3 — push?** Show local state (`git log -1 --oneline`, `git tag --list 'v*' | tail -3`) and ask explicitly whether to push. Don't pre-authorize. On yes:

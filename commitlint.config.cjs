@@ -17,5 +17,10 @@ module.exports = {
     'header-max-length': [2, 'always', 72],
     'body-leading-blank': [2, 'always'],
     'footer-leading-blank': [2, 'always'],
+    'type-enum': [
+      2,
+      'always',
+      ['build', 'chore', 'ci', 'docs', 'feat', 'fix', 'perf', 'refactor', 'release', 'revert', 'style', 'test'],
+    ],
   },
 };
