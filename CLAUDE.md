@@ -34,6 +34,7 @@ Invoke `feature-architect` first. It scopes the request, identifies decisions-ne
 - **security-engineer** — threat modeling, AI-code review, sensitive-data handling
 - **code-reviewer** — PR review against factory-pitfalls digest
 
+
 ## Slash commands (auto-loaded into `~/.claude/commands/`)
 
 Linear ticket workflow — universal, project-agnostic. Each project that wants these needs `.claude/linear.json` (run `/setup-linear` once to create it).
