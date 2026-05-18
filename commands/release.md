@@ -1,5 +1,5 @@
 ---
-description: Cut a new release — bump VERSION, commit, tag with auto-generated notes, and push. Three approval gates; user edits notes in Cursor.
+description: Cut a new release — bump VERSION, commit, tag with auto-generated notes, push, and publish a GitHub Release. Four approval gates; user edits notes in Cursor.
 argument-hint: patch | minor | major (optional — asks if omitted)
 ---
 
@@ -71,12 +71,29 @@ You're cutting a new release. The user owns the final word at every gate, and ed
     - `git push origin HEAD`
     - `git push origin v<new-version>`
 
-11. **Clean up and confirm.** Delete `/tmp/factory-kit-release-notes-v<new-version>.md`. Print:
-    > Released v<new-version>. Tag pushed *(if approved)*. Run `git show v<new-version>` to verify the annotation.
+11. **Gate 4 — publish GitHub Release?** Only runs if Gate 3 was approved (no tag on origin means nothing to release against). Pre-checks:
+    - `git remote get-url origin | grep -q github.com` — if origin isn't GitHub, **skip this gate entirely** (don't ask).
+    - `command -v gh` — if `gh` isn't on PATH, print the manual one-liner and the Releases URL, then skip. Don't fail the run.
+
+    Otherwise ask explicitly:
+    > Publish a GitHub Release for v<new-version>? Notes come from the tag annotation. (y/n)
+
+    On yes, run:
+    ```
+    gh release create v<new-version> \
+      --title "v<new-version> — <outcome-summary>" \
+      --notes-file <(git tag -l v<new-version> --format='%(contents)')
+    ```
+    `<outcome-summary>` is the same fragment used for the commit subject (step 8). Print the returned Release URL.
+
+    Rationale: tag and GitHub Release should be 1:1. Tags are the source of truth for "what shipped"; the Release page is the discoverable changelog and the feed that Renovate/Dependabot watch. Skipping it for patches creates "did this ship?" gaps on the Releases page.
+
+12. **Clean up and confirm.** Delete `/tmp/factory-kit-release-notes-v<new-version>.md`. Print:
+    > Released v<new-version>. Tag pushed *(if approved)*. GitHub Release published *(if approved)*. Run `git show v<new-version>` to verify the annotation.
 
 ## Style
 
-Follow `factory-voice.md`. Three explicit gates — notes (edited in Cursor), write (commit + tag), push — none batched, none skipped. The auto-grouped Conventional Commits list IS the changelog; don't editorialize it. Architect judgment goes on the Outcome and Why lines, which the user will rewrite in their editor. If a commit was pushed with `--no-verify` and doesn't fit the conventional format, surface it under `**other:**` so the user can decide how to characterize it.
+Follow `factory-voice.md`. Four explicit gates — notes (edited in Cursor), write (commit + tag), push, publish GitHub Release — none batched, none skipped. Gate 4 auto-skips when origin isn't GitHub or `gh` isn't installed; it never asks a question the environment can't answer. The auto-grouped Conventional Commits list IS the changelog; don't editorialize it. Architect judgment goes on the Outcome and Why lines, which the user will rewrite in their editor. If a commit was pushed with `--no-verify` and doesn't fit the conventional format, surface it under `**other:**` so the user can decide how to characterize it.
 
 ## Related
 
