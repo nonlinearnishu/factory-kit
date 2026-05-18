@@ -1,7 +1,5 @@
 # factory-kit
 
-> **Status:** v0.1.0 — Phase 0, actively iterating. Expect renames and breaking changes inside `0.x`. [Releases](https://github.com/nonlinearnishu/factory-kit/releases) are the changelog.
-
 This is the foundation for a "software factory" - Claude skills, agents, and slash commands that are all automatally symlinked into `~/.claude/`. This allows you to pull upon these skills in any repository.
 
 ## Why this exists
