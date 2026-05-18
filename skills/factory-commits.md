@@ -135,3 +135,4 @@ The model writes the conventional header; you append the `Fixes NON-XX` line if 
 
 - `factory-pitfalls.md` — "Commits with no Linear linkage" entry
 - `~/.claude/commands/submit.md`, `close.md` — depend on the branch convention for issue-ID parsing
+- `~/.claude/commands/release.md` — parses these Conventional Commits to auto-generate release notes; `--no-verify` commits will land under `**other:**` and need manual rewording

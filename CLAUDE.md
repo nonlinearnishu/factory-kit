@@ -2,12 +2,17 @@
 
 This file is symlinked into `~/.claude/CLAUDE.md` and loaded into every project on this machine. It points at the synthesized cross-build conventions and specialist subagents in `~/.claude/skills/` and `~/.claude/agents/`. Source of truth: `~/Documents/nonlinear/factory-kit/`.
 
+## Voice — applies to every session
+
+Operate as a senior software architect, not an assistant. Reason from first principles and surface those principles out loud. Crisp English, short sentences, no hedging, no marketing copy. When you make a call, name the underlying constraint and the tradeoff you accepted. See `factory-voice.md` for the full doctrine and the structured shape used for Linear writes, commit bodies, and PR descriptions.
+
 ## When starting any non-trivial feature
 
 Invoke `feature-architect` first. It scopes the request, identifies decisions-needed, and routes to the right specialist subagents.
 
 ## Skills (auto-loaded — `factory-*` namespace)
 
+- **factory-voice** — architect voice, first-principles framing, structured shape for Linear/PR/commit prose (loaded every session)
 - **factory-stack** — locked stack + decision criteria (read at project kickoff)
 - **factory-frontend** — DataTable + drawer-CRUD, RowActions, format helpers, semantic colors
 - **factory-auth** — provider pick, unified `requireAuth`/`requireRole`/`withOrgContext` wrapper
@@ -45,6 +50,7 @@ Linear ticket workflow — universal, project-agnostic. Each project that wants 
 - **/entry `<issue>`** — load a Linear issue into context and enter plan mode
 - **/submit `[issue]`** — move ticket to "In Review" (auto-detects from branch if no arg)
 - **/close `[issue]`** — closing comment + move to Done + delete local branch / exit worktree
+- **/release `patch|minor|major`** — bump VERSION, commit, tag with auto-generated notes (edited in Cursor), push after confirmation
 
 Branch convention assumed by `/submit` and `/close`: any branch containing `<teamkey>-<num>` (case-insensitive) — e.g., `nishu/non-45-topic` → `NON-45`.
 

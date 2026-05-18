@@ -22,8 +22,19 @@ You're handing a ticket off to review. This command moves it to the team's "In R
 
 4. **Move the issue.** Call `mcp__linear__save_issue` with `id` and `state` set to the `inReview` value from config. If save_issue requires a state UUID instead of a name, look it up via `mcp__linear__list_issue_statuses` for the team first.
 
-5. **Confirm completion.** Print `<KEY-N> moved to In Review.` That's it — no PR side effects.
+5. **Post a handoff comment** *(optional but default-on)*. Before flipping state, draft a short comment in the `factory-voice.md` shape so the reviewer knows what they're looking at. Density matters — links into the decision graph (PR, related issues, prior comment threads) are what make the comment useful six months later.
+
+   ```
+   **Outcome:** <one sentence — what this branch does>
+   **Why:** <the underlying constraint or principle>
+   **Tradeoff:** <if any>
+   **Refs:** <PR URL, related issue IDs, last commit SHA if no PR>
+   ```
+
+   Show the draft, ask for approval, then post via `mcp__linear__save_comment`. Skip this step if the user passes `--no-comment` or the issue already has a recent comment from this branch.
+
+6. **Confirm completion.** Print `<KEY-N> moved to In Review.` That's it — no PR side effects.
 
 ## Style
 
-Single confirmation gate, then mutate. Don't narrate intermediate fetches. If state lookup fails or the team doesn't have an "In Review" state, surface the actual state names and ask the user which to use.
+Follow `factory-voice.md`. Single confirmation gate per side effect (comment, then state move). Don't narrate intermediate fetches. The handoff comment is the reviewer's entry point — make it parseable at standup speed. If state lookup fails or the team doesn't have an "In Review" state, surface the actual state names and ask which to use.

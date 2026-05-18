@@ -34,4 +34,4 @@ You're giving the user a dev-standup view of their open Linear work in this proj
 
 ## Style
 
-Tight. Lines should be glanceable. Don't reprint the full description — just the title. Always cite issue IDs in the canonical form (e.g., `NON-45`) so the user can paste them into `/entry`.
+Follow `factory-voice.md`. Tight, glanceable lines — the user is scanning for a decision (what to pick up), not reading a report. Don't reprint full descriptions; titles only. Always cite issue IDs in canonical form (e.g., `NON-45`) so they paste straight into `/entry`. The recommendation at the end is a call, not a suggestion — name the reason in one clause ("highest priority, no blockers" / "in review > 3 days, unblock the reviewer first").

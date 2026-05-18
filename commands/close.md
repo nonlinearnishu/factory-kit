@@ -27,11 +27,17 @@ It does **not** merge a PR or push code — that's expected to have happened alr
    - `git diff --stat <main-or-default>...HEAD` — top-level files touched.
    - Linked PR state if discoverable (look at `mcp__linear__get_issue` attachments, or `gh pr list --head <branch>`). If a PR exists and isn't merged, warn — `/close` is normally a post-merge action.
 
-4. **Draft the closing comment** (≤ 150 words):
-   - **What shipped** — one or two lines on the outcome (not a diff dump).
-   - **Decisions made** — non-obvious tradeoffs worth recording for future readers. Skip if the diff is self-explanatory.
-   - **Deferred / follow-ups** — anything punted, with a one-line reason. Skip if nothing.
-   - **PR / commit:** link if applicable.
+4. **Draft the closing comment** (≤ 150 words) in the `factory-voice.md` shape — bold labels, short sentences, omit empty sections. The closing comment is the densest node in the decision graph for this issue; link liberally.
+
+   ```
+   **Outcome:** <one or two lines on what shipped — not a diff dump>
+   **Why:** <the underlying constraint or principle the work satisfied>
+   **Tradeoff:** <non-obvious tradeoffs worth recording — omit if the diff is self-explanatory>
+   **Open:** <deferred work or follow-ups; file each as its own issue if substantial and link the IDs here>
+   **Refs:** <PR # / merge commit SHA / related issue IDs / customer feedback URL if this resolved a customer ask>
+   ```
+
+   The reader is someone scanning the issue six months from now to understand *why* this exists. Skip the play-by-play; record the load-bearing decisions. If a follow-up was punted, prefer "filed as `<KEY-N>`" over "TBD" — convert open questions into graph nodes.
 
 5. **Show the draft and ask for approval.** The user can edit tone or pull anything sensitive before it lands in Linear.
 
@@ -47,4 +53,4 @@ It does **not** merge a PR or push code — that's expected to have happened alr
 
 ## Style
 
-Three gates: pre-flight review → closing comment approval → branch deletion confirmation. Don't skip any of them. If the issue is already `Done`, still offer the cleanup steps (sometimes Linear gets updated before the branch does).
+Follow `factory-voice.md`. Three gates: pre-flight review → closing comment approval → branch deletion confirmation. Don't skip any. The closing comment is the historical record — future readers will judge whether to revisit this decision based on what you write. Name principles, not symptoms. If the issue is already `Done`, still offer the cleanup steps (sometimes Linear gets updated before the branch does).

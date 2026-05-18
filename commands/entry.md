@@ -19,17 +19,19 @@ You're starting a focused work session on a single Linear issue. Load its contex
 
 5. **Check blockers.** If the issue has open `blockedBy` relations, list them and **warn loudly** before proceeding. Ask whether the user wants to continue or pick a different ticket.
 
-6. **Summarize for context (≤ 250 words):**
+6. **Summarize for context (≤ 250 words).** Use this shape — bold labels, short lines, omit any section that's empty:
    - **Issue:** `<KEY-N> — title` + priority + current state
-   - **Goal:** one sentence on what success looks like (paraphrase the description, don't re-quote it whole)
-   - **Scope (open checkboxes / acceptance criteria):** the unchecked work items
-   - **Constraints / decisions baked in:** anything in the description or comments that locks an approach
-   - **Open design calls:** "decide during build" items, ambiguous points worth resolving up front
-   - **Related issues:** parent, sub-issues, blockedBy/blocks — just IDs + titles
-   - **Linked resources:** PR URLs, attachments, design docs
+   - **Outcome:** one sentence on what "done" observably looks like. If the issue lacks a clear outcome, say so — that's the first thing to fix.
+   - **Scope:** the unchecked acceptance criteria / open checkboxes
+   - **Constraints baked in:** anything in the description or comments that locks an approach — name the underlying force (compliance, perf budget, prior decision), not just the rule
+   - **Customer voice:** if user feedback is quoted in the issue or linked, surface the raw words — don't paraphrase
+   - **Open design calls:** "decide during build" items worth resolving up front
+   - **Context graph:** parent, sub-issues, blockedBy/blocks, linked PRs, design docs — IDs + titles only. This is the issue's place in the wider decision graph; if it looks isolated, flag it as a yellow flag.
 
-7. **Enter plan mode.** Call `EnterPlanMode`. Use the loaded context to draft an implementation plan during plan mode — don't start coding until the user exits plan mode with approval.
+7. **Flag issue quality** *(brief — one line if everything is fine).* Linear's house style is: short title with a concrete outcome, body only as long as needed. If the issue is missing a clear outcome, written as a user story, or sitting orphaned with no context links, name it. Don't fix it silently — surface it so the user can decide whether to rewrite before designing the change.
+
+8. **Enter plan mode.** Call `EnterPlanMode`. Use the loaded context to draft an implementation plan during plan mode — don't start coding until the user exits plan mode with approval.
 
 ## Style
 
-Tight bullet points. No marketing copy. Surface non-obvious constraints — invariants, prior decisions, blocking-relation warnings. The reader is *you, two minutes from now, about to design the change* — give yourself what you'd need.
+Follow `factory-voice.md`. The reader is *you, two minutes from now, about to design the change* — give yourself what you'd need to make calls. Surface non-obvious constraints (invariants, prior decisions, blocking relations) at the top, not buried. No marketing copy, no hedging. If a constraint locks the design, name the principle behind it, not just the rule.
