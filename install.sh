@@ -45,8 +45,12 @@ link_dir() {
   shopt -u nullglob
 }
 
-echo "Installing factory-kit from ${KIT_ROOT}"
+KIT_VERSION="$( cat "${KIT_ROOT}/VERSION" 2>/dev/null || echo "unknown" )"
+KIT_COMMIT="$( git -C "${KIT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "no-git" )"
+
+echo "Installing factory-kit v${KIT_VERSION} (${KIT_COMMIT}) from ${KIT_ROOT}"
 echo "Target: ${CLAUDE_ROOT}"
+echo "Tip: 'git checkout v${KIT_VERSION}' before re-running to pin a release; HEAD is the moving edge."
 echo
 
 for subdir in skills agents commands; do
