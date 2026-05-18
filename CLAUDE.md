@@ -19,6 +19,7 @@ Invoke `feature-architect` first. It scopes the request, identifies decisions-ne
 - **factory-security** — KMS-at-rest, BAA, safe redirects, admin-client guardrails, AI-code risk
 - **factory-observability** — PostHog + Sentry day 1, trace IDs, structured logs, audit logging
 - **factory-deployment** — Vercel + Neon + Cloud Run + Terraform (single-tenant for compliance)
+- **factory-commits** — Conventional Commits + required Linear issue ID; commitlint config, Husky hook, opencommit wiring
 - **factory-pitfalls** — anti-pattern digest indexed across all skills; use as PR checklist
 
 ## Specialist subagents (callable via Agent tool)
