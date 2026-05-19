@@ -5,43 +5,31 @@ description: Commit message and branch convention — Conventional Commits forma
 
 # Factory commits
 
-Every commit ties to a Linear issue. We use Conventional Commits as the syntactic frame and Linear's magic words to drive issue automation. This skill is the single source of truth — projects inherit it via the `@commitlint` config below.
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the commitlint / Husky / opencommit shape we use), and **Failure mode** when there's one to name.
 
-## The rule
+## Tie every commit to a Linear issue
 
-A commit message MUST:
+**Principle.** Every commit references a Linear issue ID in the subject or body; the commit hook enforces it.
+
+**Why.** Code changes without ticket linkage are unsearchable history — six months later, "why did we change this?" has no answer that doesn't require a full archaeology session. Linear linkage makes the graph dense: ticket → PR → commit → context → decision. Each link is cheap up front; the lookup savings compound. Enforcement via commit-msg hook is the difference between "we should" and "we do."
+
+**Recipe.** A commit message MUST:
 
 1. Start with a Conventional Commits header: `<type>(<scope>)?: <subject>` (scope optional).
 2. Contain a Linear issue ID (`<TEAM>-<NUM>`, e.g. `NON-45`) somewhere — subject **or** body.
 3. Use a Linear magic word + ID for the commit that should close the issue.
 
-A commit message SHOULD:
+A commit message SHOULD keep the subject under 72 chars, imperative mood, no trailing period. Put the *why* in the body when the diff doesn't make it obvious.
 
-- Keep the subject under 72 chars, imperative mood, no trailing period.
-- Put the *why* in the body when the diff doesn't make it obvious.
+**Failure mode.** Commits with no Linear linkage — months later, archaeology requires reading the diff itself because there's no ticket trail.
 
-## Linear magic words
+## Subject describes the change; magic word lives in the body
 
-Use these in the commit body (or PR description) to drive Linear automation. Case-insensitive.
+**Principle.** The subject describes what changed; the Linear magic word goes in the body.
 
-| Effect | Words |
-|---|---|
-| Closes issue on merge to default branch | `close`, `closes`, `closed`, `closing`, `fix`, `fixes`, `fixed`, `fixing`, `resolve`, `resolves`, `resolved`, `resolving`, `complete`, `completes`, `completed`, `completing`, `implements`, `implemented`, `implementing` |
-| Links issue without closing | `ref`, `refs`, `references`, `part of`, `related to`, `contributes to`, `toward`, `towards` |
+**Why.** "feat(auth): closes NON-45" looks tidy but conflates two things — what the commit does and what ticket it closes. The subject is the scannable description; the body is where automation hooks. Keeping the magic word in the body means the subject reads as a changelog entry, not a ticket-management instruction.
 
-**Default to a closing word** on the last commit of a branch — that's usually the one that lands on main and you want the ticket to flip to Done automatically.
-
-## Branch convention
-
-`<user>/<teamkey>-<num>-<short-topic>` — lowercase. The `/setup-linear`, `/submit`, and `/close` slash commands all parse the issue ID out of the branch name with `<teamkey>-<num>` (case-insensitive).
-
-Examples:
-- `nishu/non-45-commit-conventions` → NON-45
-- `nishu/eng-218-rate-limiter-fix` → ENG-218
-
-Get the canonical branch name from Linear: `Cmd+Shift+.` on an issue copies it to clipboard.
-
-## Good vs bad
+**Recipe.**
 
 ```
 ✓ feat(auth): add SSO callback handler
@@ -55,21 +43,45 @@ Get the canonical branch name from Linear: `Cmd+Shift+.` on an issue copies it t
 ✗ feat: add login flow
    (no Linear ID anywhere — commit-msg hook rejects)
 
-✗ Updates files
-   (no type prefix, no scope, no ID)
-
 ✗ feat(auth): closes NON-45
-   (subject is the magic word; subject should describe the change, magic word lives in body)
+   (subject is the magic word; subject should describe the change)
 ```
 
-## commitlint.config.cjs (drop into project root)
+## Linear magic words — close vs link
+
+**Recipe only** — the closing-word/linking-word distinction is provided by Linear; pick the right one per commit.
+
+| Effect | Words |
+|---|---|
+| Closes issue on merge to default branch | `close`, `closes`, `closed`, `closing`, `fix`, `fixes`, `fixed`, `fixing`, `resolve`, `resolves`, `resolved`, `resolving`, `complete`, `completes`, `completed`, `completing`, `implements`, `implemented`, `implementing` |
+| Links issue without closing | `ref`, `refs`, `references`, `part of`, `related to`, `contributes to`, `toward`, `towards` |
+
+**Default to a closing word** on the last commit of a branch — that's usually the one that lands on main and you want the ticket to flip to Done automatically.
+
+## Branch convention — issue ID parseable from branch name
+
+**Principle.** The Linear issue ID is parseable out of the branch name; slash commands depend on this.
+
+**Why.** `/submit` and `/close` need to know which Linear issue the current branch belongs to. Asking the user every time is friction; storing it in a config file drifts. The branch name is the only state that's already correct by definition (you just made the branch for that issue). Format: `<user>/<teamkey>-<num>-<short-topic>`. The case-insensitive `<teamkey>-<num>` pattern is what the slash commands grep for.
+
+**Recipe.**
+
+```
+nishu/non-45-commit-conventions  →  NON-45
+nishu/eng-218-rate-limiter-fix   →  ENG-218
+```
+
+Get the canonical branch name from Linear: `Cmd+Shift+.` on an issue copies it to clipboard.
+
+## commitlint config — the canonical drop-in
+
+**Recipe only** — drop the config into the project root, install the hook, done.
 
 ```js
 /** @type {import('@commitlint/types').UserConfig} */
 module.exports = {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    // Conventional Commits: type/scope/subject shape (inherited from extends).
     'subject-case': [2, 'never', ['pascal-case', 'upper-case']],
     'subject-empty': [2, 'never'],
     'subject-full-stop': [2, 'never', '.'],
@@ -78,7 +90,6 @@ module.exports = {
     'footer-leading-blank': [2, 'always'],
 
     // Adds `release` as a first-class type — used by /release for version-cut commits.
-    // Standard list comes from @commitlint/config-conventional; we extend it.
     'type-enum': [
       2,
       'always',
@@ -120,9 +131,13 @@ chmod +x .husky/commit-msg
 
 (Swap `pnpm` for `npm`/`yarn`/`bun` per project.)
 
-## opencommit configuration
+## opencommit — wire the AI commit writer to the commitlint config
 
-The lazygit + opencommit + Ollama setup is the assistant-side complement. Point opencommit at the commitlint config so the model phrases commits to pass our rules:
+**Principle.** AI-assisted commit writing reads the project's commitlint config; the model phrases commits to pass the rules, not invent its own conventions.
+
+**Why.** A model that writes commits without reading the project's rules will use its training-set defaults, which drift across projects. Pointing opencommit at `@commitlint` makes the model's output the project's rule-conformant shape — fewer rejections, less manual rewriting. The cost is one config line; the benefit is every AI commit fits the project.
+
+**Recipe.**
 
 ```bash
 oco config set OCO_AI_PROVIDER=ollama
@@ -133,28 +148,33 @@ oco config set OCO_OMIT_SCOPE=true   # model invents bad scopes; let humans add 
 oco config set OCO_DESCRIPTION=true  # body needed to hold the magic-word + Linear ID
 ```
 
-The model writes the conventional header; you append the `Fixes NON-XX` line if it didn't infer the ID from branch context. (Future enhancement: a pre-commit step that injects the branch's Linear ID into the body automatically.)
+The model writes the conventional header; you append the `Fixes NON-XX` line if it didn't infer the ID from branch context.
 
-## The `release:` type
+## `release:` as a first-class type — not `chore(release):`
 
-Release commits use the custom `release:` type (added to `type-enum` above), not `chore(release):`. Reasoning: a release is a first-class category in the changelog, not a chore. The `/release` slash command emits these automatically — you shouldn't be hand-writing them.
+**Principle.** Release commits get their own Conventional Commits type; they aren't chores.
+
+**Why.** A release is a first-class category in the changelog — it deserves a section, not to be buried in `chore`. Adding `release:` to the `type-enum` makes the release commit greppable, lets the `/release` command emit it consistently, and lets changelog tools group it on its own. The exemption from `linear-id-present` is deliberate — releases roll up many issues whose IDs live in the tag annotation, not the subject.
+
+**Recipe.**
 
 ```
 ✓ release: v0.1.1 — Linear factory setting update
 ✓ release: v0.2.0 — drawer-CRUD scaffolding
 ```
 
-Release commits are exempt from `linear-id-present` (see the rule body) — the release rolls up many issues, and their IDs live in the tag annotation, not the subject.
+Release commits are exempt from `linear-id-present` (see the rule body).
 
 ## When the rule doesn't apply
 
-- **The factory-kit itself** — meta-repo, not connected to Linear. Use Conventional Commits but skip the ID requirement. Drop the `linear-id-present` rule from the kit's own `commitlint.config.cjs` (the kit currently doesn't have one — fine).
+**Recipe only** — narrow exemptions.
+
+- **The factory-kit itself** — meta-repo, not connected to Linear. Use Conventional Commits but skip the ID requirement. Drop the `linear-id-present` rule from the kit's own `commitlint.config.cjs`.
 - **Drive-by typo fixes during another task** — fold into the parent commit; don't create a separate ID-less commit.
 - **Initial commit / scaffold commits** — exempt; tag with `chore: initial scaffold`.
 - **Release commits** — `release:` type is exempt by the custom rule (see above).
 
 ## Related
 
-- `factory-pitfalls.md` — "Commits with no Linear linkage" entry
 - `~/.claude/commands/submit.md`, `close.md` — depend on the branch convention for issue-ID parsing
 - `~/.claude/commands/release.md` — parses these Conventional Commits to auto-generate release notes; `--no-verify` commits will land under `**other:**` and need manual rewording

@@ -10,7 +10,11 @@ Operate as a senior software architect, not an assistant. Reason from first prin
 
 Invoke `feature-architect` first. It scopes the request, identifies decisions-needed, and routes to the right specialist subagents.
 
-## Skills (auto-loaded — `factory-*` namespace)
+## Skills — structured principle-first
+
+Each `factory-*.md` skill is structured **Principle** (what holds regardless of stack) → **Why** (constraint → option → tradeoff) → **Recipe** (the stack-locked shape) → **Failure mode** (when applicable). A reader on a different stack can read the principle and why of any section and skip the recipe. The kit is opinionated on the recipe layer and shareable on the principle layer — by structure, not by separate files.
+
+Skills auto-load on the `factory-*` namespace:
 
 - **factory-voice** — architect voice, first-principles framing, structured shape for Linear/PR/commit prose (loaded every session)
 - **factory-stack** — locked stack + decision criteria (read at project kickoff)
@@ -25,7 +29,7 @@ Invoke `feature-architect` first. It scopes the request, identifies decisions-ne
 - **factory-observability** — PostHog + Sentry day 1, trace IDs, structured logs, audit logging
 - **factory-deployment** — Vercel + Neon + Cloud Run + Terraform (single-tenant for compliance)
 - **factory-commits** — Conventional Commits + required Linear issue ID; commitlint config, Husky hook, opencommit wiring
-- **factory-pitfalls** — anti-pattern digest indexed across all skills; use as PR checklist
+- **factory-pitfalls** — flat cross-skill index of Failure mode blocks + process-level pitfalls without a skill home
 
 ## Specialist subagents (callable via Agent tool)
 

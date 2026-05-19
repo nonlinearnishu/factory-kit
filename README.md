@@ -6,7 +6,11 @@ This is the foundation for a "software factory" - Claude skills, agents, and sla
 
 This repository is a synthesis of learnings across multiple production builds. In each one, I went through a learning journey to understand how to build a production-ready stack. Over countless hours, I tried to understand when and when not to implement specific components. Now, I've pulled my learnings into a set of skills & agents that I can use whenever I start a new project.
 
-This is also becoming a public record of how I am iterating towards a "software factory". Over time, as more code gets generated, I believe the differentiating layer will be the architectural decisions that get made during the build. I want to codify as many of these as I can throughout my journey so that I can consistently come back to them. 
+This is also becoming a public record of how I am iterating towards a "software factory". Over time, as more code gets generated, I believe the differentiating layer will be the architectural decisions that get made during the build. I want to codify as many of these as I can throughout my journey so that I can consistently come back to them.
+
+## Structure — principles-first, stack-locked recipes
+
+Each `factory-*.md` skill leads each section with the **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the Next.js / Drizzle / Better Auth / Mantine / Cloud Run shape we use), and a **Failure mode** block when there's one to name. A reader on a different stack can read the principle and why of any section and skip the recipe. The kit is opinionated on the recipe layer and shareable on the principle layer — by structure, not by separate files.
 
 ## Layout
 
@@ -54,7 +58,7 @@ Synthesized cross-build conventions. Auto-loaded by Claude Code from `~/.claude/
 | `factory-observability` | PostHog + Sentry day 1, activity logging, trace IDs |
 | `factory-deployment` | Vercel + Cloud Run + Terraform conventions |
 | `factory-commits` | Conventional Commits + required Linear-ID; commitlint config |
-| `factory-pitfalls` | Anti-patterns digest indexed across all domains; usable as PR checklist |
+| `factory-pitfalls` | Flat cross-skill index of Failure mode blocks + process-level pitfalls without a skill home |
 
 ### Agents (specialist subagents)
 
