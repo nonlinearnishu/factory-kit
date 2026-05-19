@@ -78,6 +78,8 @@ Non-root user; `PYTHONUNBUFFERED=1` for log streaming.
 
 ## GitHub Actions — ephemeral DBs + matrix deploy
 
+> **Cross-reference.** `factory-ci.md` owns the merge gate (typecheck, lint, test, build, claude-review). This section owns the deploy half — the Neon branch action for ephemeral PR DBs that the `test` job depends on, and the matrix-deploy jobs that run after the gate passes on `main`.
+
 **Principle.** Every PR gets a real ephemeral database via Neon branch; production data and dev data never mix in test pipelines.
 
 **Why.** Shared dev DBs are a constant source of false test failures — a parallel PR mutated the schema, another test left stale rows, the test that "always passed" suddenly doesn't. Ephemeral per-PR DBs eliminate the shared state: each PR's tests run against a clean branch off main, deleted on PR close. The cost is one Neon project; the benefit is test reliability.

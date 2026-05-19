@@ -30,6 +30,12 @@ Each entry: one line, pointing at the skill section that owns it.
 
 - **Monolithic 1,500-line form** — `factory-forms.md §Modular section files from day one`
 
+### Testing
+
+- **No tests under `src/`** — `factory-testing.md §Tests-before-merge — coverage gates, not test-first dogma`
+- **Mock-only tests passing while prod fails** — `factory-testing.md §Test the boundaries; trust the framework`
+- **Snapshot tests as the only coverage** — `factory-testing.md §E2E owns user flows; unit owns behavior`
+
 ### Frontend
 
 - **Two-way state-DB sync** — `factory-frontend.md §One direction of truth`
@@ -61,6 +67,12 @@ Each entry: one line, pointing at the skill section that owns it.
 
 - **Migrations at runtime (in Cloud Run CMD)** — `factory-deployment.md §Migrations — CI, never runtime`
 
+### CI
+
+- **Claude reviewer wired as advisory, not required** — `factory-ci.md §Claude Code reviewer is a required check, not an advisory bot`
+- **Required-checks list drifts from workflow jobs** — `factory-ci.md §Branch protection — short list, load-bearing`
+- **Pre-push hook treated as the merge gate** — `factory-ci.md §Pre-push hooks — fast feedback, not the gate`
+
 ### Observability
 
 - **Regenerated trace IDs at service hops** — `factory-observability.md §Trace ID — propagate, don't regenerate`
@@ -78,12 +90,6 @@ These are kit-shape and project-shape failures that don't fit any one skill's do
 Legacy `applicationProgress.ts`, intermediate `sectionProgress.ts`, and unified `progress-calculator.ts` all live in the same repo. The newer file is the source of truth but the older ones never got deleted.
 
 **Right move:** when you write a unifier, delete the inputs in the same PR. Half-finished refactors are worse than untouched code — they imply the newer file is the truth while leaving the older ones as plausible alternatives that future contributors will pull from.
-
-### No tests under `src/`
-
-A production-grade CRUD repo with zero test coverage. Nothing to extract as a "testing skill" because tests have to be authored from scratch.
-
-**Right move:** Vitest + a smoke test for each feature folder from project setup. Add to the project's `DECISIONS.md` as a layer-3 commitment.
 
 ### No `DECISIONS.md` per project
 
