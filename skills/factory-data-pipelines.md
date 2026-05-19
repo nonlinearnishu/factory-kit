@@ -1,13 +1,19 @@
 ---
 name: factory-data-pipelines
-description: Data ingestion and pipeline conventions for projects that import CSVs, run simulations, or operate Python services alongside Next.js. Covers Papa Parse for CSV imports, JSONB envelope storage for time-series data, the three-entry-point Python service pattern (CLI / Cloud Run API / Pub/Sub handler), YAML config for service-level data, geopandas/shapely for geospatial work, and deployment via Cloud Run + ephemeral Neon DBs.
+description: Data ingestion and pipeline conventions for projects that import CSVs, run simulations, or operate Python services alongside Next.js. Covers Papa Parse for CSV imports, JSONB envelope storage for time-series data, the three-entry-point Python service pattern (CLI / Cloud Run API / Pub/Sub), YAML config for service-level data, geopandas/shapely for geospatial work, and deployment via Cloud Run + ephemeral Neon DBs.
 ---
 
 # Factory data pipelines
 
-## CSV ingestion — TypeScript scripts with Papa Parse
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the Papa Parse / FastAPI / Cloud Run shape we use), and **Failure mode** when there's one to name. Sections that are pure style with no deeper truth are marked `Recipe only`.
 
-Default shape for one-shot or scheduled CSV imports:
+## CSV ingestion — a script, not a framework
+
+**Principle.** A one-shot CSV importer is a standalone script in `scripts/`; promote to a framework only when a second consumer appears.
+
+**Why.** Premature job-framework adoption for a single CSV importer is paying the abstraction cost without the abstraction benefit. A standalone script with Papa Parse and a Drizzle transaction is grep-able, debuggable, runnable locally. Wrapping it in BullMQ / Inngest / a Cloud Run job buys nothing until there's a second importer that shares the wrapper.
+
+**Recipe.**
 
 ```
 scripts/
@@ -18,8 +24,6 @@ scripts/
     └── vins/
         └── import-vins.ts
 ```
-
-Each script is standalone — uses `papaparse`, opens a Drizzle connection, runs in a transaction, exits. Don't wrap in a job framework until there's a second consumer.
 
 ```ts
 import Papa from 'papaparse';
@@ -37,7 +41,11 @@ await db.transaction(async (tx) => {
 
 ## Time-series / event storage — JSONB envelope
 
-For simulation data, event streams, or anything time-series-shaped where the inner schema may evolve:
+**Principle.** What drives queries gets a real column. What doesn't goes in a JSONB envelope. The schema inside JSONB can evolve without a migration.
+
+**Why.** Time-series data and event streams have an outer schema (the row) and an inner schema (the payload). The outer schema needs to be queryable — filter by `fleetId`, sort by time, join across rows. The inner schema is consumed by application code that already speaks its types, doesn't need a SQL index, and may evolve faster than migrations can keep up. JSONB envelope splits these clean: columns for outer, JSONB for inner. The trap is querying inside JSONB at app speed — once you're doing that, the field has earned a column.
+
+**Recipe.**
 
 ```ts
 export const simulations = pgTable('simulations', {
@@ -53,11 +61,13 @@ export const simulations = pgTable('simulations', {
 });
 ```
 
-**Rule:** what drives queries (filters, sorts, joins) gets a real column. The rest goes in JSONB. Don't query inside JSONB at app speed — if you need to, the field has earned a column.
+## YAML-driven service config
 
-## YAML-driven service config (Python side)
+**Principle.** Service-level reference data (routes, vehicle specs, charger specs) lives in YAML, not code; env-overridable per environment.
 
-For Python services that read static / slowly-changing reference data:
+**Why.** "Static" reference data is the part of the system the domain expert most wants to edit, and the part engineers least want to redeploy for. YAML in a config directory is the seam: the domain expert opens the file, edits a value, and the change ships through the same review process as code without code-thinking required. Env-driven base paths let prod, staging, and customer-specific overrides coexist.
+
+**Recipe.**
 
 ```
 models/<service>/
@@ -70,11 +80,15 @@ models/<service>/
         └── data_service.py    # loads + validates + serves the config
 ```
 
-JSON config overrides via env var or request payload. Don't put this data in code — it's the seam your customer (or your future self) edits.
+JSON config overrides via env var or request payload.
 
 ## Three-entry-point pattern (Python services)
 
-Every Python service has three entry points sharing core logic:
+**Principle.** A Python service has three entry points sharing one core: CLI for local runs, FastAPI for HTTP, Pub/Sub handler for async jobs. The entry points are thin; the core does the work.
+
+**Why.** The same simulation needs to run three ways: locally for development, synchronously for short jobs over HTTP, asynchronously for long jobs via queue. Three separate codebases means three places to fix every bug. One core with three entry points means the work is defined once; the wrappers only differ in I/O. Each entry point is a fifty-line file that calls the core.
+
+**Recipe.**
 
 ```
 models/<service>/
@@ -91,7 +105,11 @@ models/<service>/
 
 `simulation_runner.py` is mode-aware (CLI vs Cloud) — structured log paths, GCS + DB integration. The three entry points are thin wrappers.
 
+**Failure mode.** Sharing Pydantic models across the three entry points by copy-paste — the models drifted, deserialization broke at the Pub/Sub boundary, only visible when the queue replayed.
+
 ## FastAPI conventions
+
+**Recipe only** — the principles (API key from header, OpenAPI off in prod, Pydantic for shapes, lifespan-managed DB engine, request ID for tracing) are encoded in the recipe itself.
 
 - API-key dependency: `get_api_key()` reads from header, validates against env
 - OpenAPI docs toggleable via env (off in prod)
@@ -109,7 +127,11 @@ async def log_requests(request: Request, call_next):
     return response
 ```
 
+See `factory-observability.md` for the trace-ID propagation principle.
+
 ## Cloud Pub/Sub triggering from Next.js
+
+**Recipe only** — env-driven credentials, JSON payload.
 
 ```ts
 // src/server/cloud/cloudRun.ts
@@ -121,9 +143,13 @@ export async function triggerSimulationJob(payload: SimulationRequest) {
 
 GCP credentials from env (JSON string or file path — use the env-driven helper, not hardcoded paths).
 
-## Submit / poll / fetch async pattern
+## Submit / poll / fetch — async over HTTP timeout
 
-For batch jobs where the runtime exceeds HTTP timeout: submit returns a job ID, client polls a status endpoint, fetches results separately.
+**Principle.** When a job exceeds HTTP timeout, split into three idempotent operations: submit returns a job ID, client polls status, fetches result separately.
+
+**Why.** Long-running HTTP calls are fragile — the load balancer's timeout, the client's timeout, the proxy's timeout. Each adds a failure mode that doesn't recover. Submit/poll/fetch breaks the work into three short operations that each fit comfortably under any timeout. Each operation is idempotent (submit can dedupe; status is a read; fetch is a read), so retries are safe.
+
+**Recipe.**
 
 ```ts
 const { jobId } = await fleetsim.submit(payload);
@@ -135,40 +161,32 @@ Three endpoints, three idempotent operations. Never block the client on a single
 
 ## Converter vs service split
 
-For external-API or compute-heavy code:
+**Principle.** Pure transformations live in `*-converter.ts` (client-safe, no I/O); orchestration lives in `*-service.ts` (server-only, may call multiple converters).
 
-- **Converter** (`*-converter.ts`) — pure transformation functions. Client-safe. No I/O.
-- **Service** (`*-service.ts`) — orchestrates I/O. Server-only. May call multiple converters.
+**Why.** Mixing pure transforms with I/O makes the transforms untestable without mocking and unusable on the client. Splitting them lets the same conversion function run in a browser preview and in the server-side service that talks to the world. The boundary is enforceable: a converter that imports `fetch` or a DB client is a converter that's blurred its line.
 
-Don't blur the boundary — converter is the part you reuse in the client; service is the part that talks to the world.
+**Recipe.** Converter is the part you reuse in the client; service is the part that talks to the world.
 
-## Geospatial — geopandas + shapely
+## Geospatial — `geopandas + shapely` in one service file
 
-Route loading from GeoJSON, coordinate extraction from `LineString` / `MultiLineString` / `Polygon` belongs in a single `data_service.py`. Don't duplicate per consumer.
+**Recipe only** — route loading from GeoJSON, coordinate extraction from `LineString` / `MultiLineString` / `Polygon` belongs in a single `data_service.py`. Don't duplicate per consumer.
 
 ## Deployment
+
+**Recipe only** — the principles (one service per entry-point variant; migrations in CI, not runtime; ephemeral Neon branch per PR) are stated in `factory-deployment.md` and `factory-data-layer.md`.
 
 - **Web (Next.js):** Vercel
 - **Python services:** Cloud Run, one service per Python entry-point variant (separate Dockerfiles, different startup commands)
 - **DBs:** Neon for web (branch-per-PR via GitHub Actions); shared instance for backend services
 - **GitHub Actions:** ephemeral Neon DB per PR; matrix-deploy web + each Python service to Cloud Run on merge
 
-Migrations run in CI, not at runtime.
+## Don't pre-build shared `libs/`
 
-## What NOT to do
+**Principle.** Don't scaffold a shared library before the second consumer exists; empty scaffolding is worse than no scaffolding.
 
-- **Don't pre-build `libs/py-libs/` shared utilities.** Empty scaffolding is worse than no scaffolding. Wait for the second consumer.
-- **Don't query inside JSONB at app speed.** If a field drives a query, promote it to a column.
-- **Don't write CSV import logic as a Cloud Run job before the second use case.** A standalone TS script in `scripts/` is enough until proven otherwise.
-- **Don't hardcode YAML paths.** Use env-driven base paths so config is overridable per environment.
-- **Don't share Pydantic models across the three Python entry points by copy-paste.** Define once in `models/`, import everywhere.
-- **Don't run migrations inside Cloud Run startup.** Migrations are CI's job.
-- **Don't blur converter / service boundaries.** Pure-transform code stays in `*-converter.ts`; I/O lives in `*-service.ts`.
+**Why.** A `libs/py-libs/` directory with three modules and no callers signals "shared code lives here" without any actual shared code. New contributors put things there that aren't shared; the first real refactor has to untangle that misuse. Wait for the second consumer; extract then.
 
-## Pitfalls referenced
-
-- **Raw SQL with hand-mapped row→object functions** (encode/monorepo) is verbose, error-prone, no type inference. Use Drizzle web-side; SQLAlchemy with the SoftDelete mixin Python-side.
-- **Mixed migration-file naming** (timestamped + descriptive in the same dir) makes schema evolution hard to read. Pick one and stick.
+**Recipe.** First implementation lives in the consuming service. Second consumer is the trigger to extract. The third consumer confirms the extraction was right.
 
 ## Source patterns
 

@@ -5,9 +5,15 @@ description: Security conventions for builds that touch sensitive data, regulate
 
 # Factory security
 
-## Sensitive data at rest
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the KMS / Resend / Upstash shape we use), and **Failure mode** when there's one to name.
 
-For SSN, government IDs, full PHI fields, financial account numbers:
+## Sensitive data at rest — encrypted with context binding
+
+**Principle.** Sensitive data (SSN, government IDs, PHI fields, financial accounts) is KMS-encrypted at rest, with encryption context bound to the row's identity.
+
+**Why.** Encryption alone protects against database exfiltration but not against row-shuffling — an attacker who can write to the database can swap encrypted blobs between rows, and the system decrypts each happily. Binding the encryption context to the user ID (or org ID) means KMS refuses to decrypt the blob when the context doesn't match — the row-shuffling failure mode becomes a decryption failure, which is loud.
+
+**Recipe.**
 
 ```ts
 // Encrypt on write
@@ -24,13 +30,13 @@ const plaintext = await kms.decrypt(user.ssnEncrypted, { context: { userId } });
 const masked = `***-**-${plaintext.slice(-4)}`;
 ```
 
-**Encryption context** (`{ userId }`) is bound to the ciphertext — KMS refuses to decrypt with a different context. Prevents row-shuffling attacks.
+## PHI in email/SMS — BAA at runtime, not in comments
 
-## PHI in email/SMS — BAA required
+**Principle.** Provider BAA status for PHI-bearing channels (email, SMS) is asserted at runtime; comments don't enforce.
 
-If a project emails or texts content that could include PHI (charge sheets, lab results, scheduling), **verify the provider has a BAA with the customer**. Resend has a BAA option; ensure it's signed before production.
+**Why.** A `// TODO: confirm Resend BAA before prod` comment in the email helper is exactly as enforced as no comment at all. A runtime assertion that refuses to send PHI when the BAA-signed env var isn't `true` is enforcement: the bug becomes an outage, which is loud and gets fixed. Comments rot; assertions don't.
 
-Promote BAA checks from comments to runtime:
+**Recipe.**
 
 ```ts
 // In src/lib/email/resend.ts
@@ -39,11 +45,15 @@ if (process.env.RESEND_BAA_SIGNED !== 'true' && containsPHI(message)) {
 }
 ```
 
-Comments don't enforce; runtime assertions do.
+**Failure mode.** Kairos shipped the BAA check as a comment; the comment rotted, PHI was nearly sent in staging before someone noticed.
 
 ## Safe URL redirects
 
-OAuth `next=` params and similar redirect inputs are an open redirect bug class. Validate:
+**Principle.** Validate any redirect URL that comes from user input; never trust query-param `next=` values.
+
+**Why.** Same principle as `factory-auth.md §OAuth callback safety`. Open-redirect is a recurring bug class; the defense is a small allowlist check.
+
+**Recipe.**
 
 ```ts
 function safeNext(next: string | null): string {
@@ -56,9 +66,13 @@ function safeNext(next: string | null): string {
 
 Apply in OAuth callbacks, login redirects, post-signup redirects, and any place a URL comes in from a query param.
 
-## Admin-client bypass
+## Admin-client bypass — always wrapped, never at module scope
 
-Supabase admin client (or any service-role / RLS-bypass client) is dangerous. Wrap every use:
+**Principle.** Service-role / RLS-bypass clients live behind a wrapper that re-checks privilege; never at module scope.
+
+**Why.** Same principle as `factory-auth.md §admin client — always wrapped`. Module-scope admin client is a loaded gun; the wrapper makes the privilege check unavoidable at every call site.
+
+**Recipe.**
 
 ```ts
 export async function withAdmin<T>(
@@ -69,13 +83,13 @@ export async function withAdmin<T>(
 }
 ```
 
-**Never expose the admin client at module scope** — always behind a function that takes an auth check first.
+## Rate limiting — Redis on serverless, in-memory only as prototype
 
-## Rate limiting — single-instance is not horizontal
+**Principle.** Production rate limiting on serverless uses Redis (or equivalent shared store); in-memory limiters don't survive horizontal scaling.
 
-In-memory rate limiters work for single-server / single-region setups only. On Vercel, AWS Lambda, or any serverless runtime, each invocation has its own memory — the limiter doesn't work across instances.
+**Why.** A `Map<key, count>` in module scope works fine on one server. On Vercel, AWS Lambda, or any platform with horizontal scaling, each instance has its own memory — the limiter resets across instances, and the effective limit is `(per-instance limit) × (instance count)`. The fix is a shared store. Upstash Redis is the lowest-friction option; the migration is a one-day swap.
 
-For production: Upstash Redis with `@upstash/ratelimit`.
+**Recipe.**
 
 ```ts
 const ratelimit = new Ratelimit({
@@ -87,11 +101,17 @@ const { success } = await ratelimit.limit(`${bucket}:${subject}`);
 if (!success) throw new RateLimitError();
 ```
 
-In-memory rate limiters are acceptable for prototype phase only. Migrate before scaling.
+In-memory rate limiters are acceptable for prototype phase only.
+
+**Failure mode.** Kairos shipped an in-memory rate limiter to prod with a comment acknowledging it; the comment didn't migrate to Upstash until a user-facing incident.
 
 ## AI-generated code — read-only by default
 
-Per Veracode, ~45% of AI-generated code has vulnerabilities. Mitigations at the harness layer:
+**Principle.** Code paths reachable by AI-generated code default to read-only; write access is opt-in per feature and surfaces in a review queue.
+
+**Why.** ~45% of AI-generated code has vulnerabilities (Veracode). The harness layer carries the defense, not the model. Read-only by default means a runaway agent can't corrupt production data; opt-in writes per feature means the write paths are auditable; mandatory review means the human stays in the loop. The cost is some friction on the happy path; the benefit is the catastrophic failure mode never ships.
+
+**Recipe.**
 
 1. **Read-only by default.** Database connections, file system access, external APIs default to read-only. Write access is opt-in per feature and surfaces in the review queue.
 2. **Mandatory review before prod.** No code path that mutates production data ships without explicit human approval. Lift from the Stripe Minions Blueprint / Cursor PR-flow pattern.
@@ -100,30 +120,48 @@ Per Veracode, ~45% of AI-generated code has vulnerabilities. Mitigations at the 
 
 This is the explicit differentiator vs. consumer vibe-coding tools (Lovable, Replit, v0). The harness's job is to make AI-generated code *safe to ship*.
 
-## Auth surface
+**Failure mode.** Base44, Replit prod-DB wipe, Cursor RCE — public incidents where the model touched production state without a review queue.
 
-- **Never hardcode allowlists in code.** Move to a `users` / `members` table with role from the start. Allowlist-in-config doesn't scale past 10 entries.
-- **Always validate JWT signatures** (Clerk uses RS256). Never trust unsigned claims.
-- **Fallback user-linking on first request** — if your webhook hasn't arrived but the user has a valid token, create the user record inline. Don't 404 valid users.
+## Auth surface — DB-backed members, JWT signatures, fallback user-linking
+
+**Recipe only** — the principles live in `factory-auth.md`:
+
+- DB-backed members table from day one (not hardcoded allowlist) — see `factory-auth.md §hardcoded email allowlists`.
+- Verify JWT signatures on every request — see `factory-auth.md §JWT signature verification`.
+- Fallback user-linking on first valid-token request — see `factory-auth.md §fallback user-linking on first valid token`.
 
 ## Secrets management
 
-- **Never commit secrets.** Use env vars validated through `t3-oss/env-nextjs`.
-- **Credential vault** at the customer-deployed harness level: AWS Secrets Manager or GCP Secret Manager. Customer secrets never live in this kit's repo.
-- **RDS IAM authentication** for AWS DBs: rotates every 14 minutes; no long-lived password.
+**Principle.** Customer secrets never live in the factory's repo; they live in the customer's cloud secrets manager.
 
-## Logging — don't log sensitive data
+**Why.** The single-tenant customer-cloud model (see `factory-deployment.md`) is the commercial wedge — customer data residency, customer-controlled secrets. Putting customer secrets in the factory's repo defeats the model, makes the factory's compliance posture cover the customer's compliance posture, and creates a leak surface that the customer can't audit.
 
-Audit logs should record *what* happened, not *the full payload*:
+**Recipe.**
+
+- Use env vars validated through `t3-oss/env-nextjs` for the project's own env.
+- Customer secrets at the customer-deployed harness level: AWS Secrets Manager or GCP Secret Manager.
+- RDS IAM authentication for AWS DBs (see `factory-deployment.md §RDS IAM authentication`).
+
+## Logging — log actions and IDs, not payloads
+
+**Principle.** Audit logs record *what* happened, not *the full payload*. PII in logs creates compliance scope creep.
+
+**Why.** Once a payload with PII lands in the log stream, the log stream inherits the PII's protection requirements — same access controls as the source database, same retention policy, same audit trail. The cost of getting this wrong is that the logging system becomes a compliance surface. The fix is to log structurally: `{ user_id, action, timestamp }`, never `{ user_id, action, payload }`.
+
+**Recipe.**
 
 - **Log:** `{ user_id, action: 'updated_ssn', timestamp }`
 - **Don't log:** `{ user_id, action: 'updated_ssn', old_value: '123-45-6789' }`
 
-PII in logs creates compliance scope creep — logs end up needing the same protection as the source database. Redact at the logger layer if you can't avoid it at the call site.
+Redact at the logger layer if you can't avoid it at the call site.
 
-## Request tracing
+## Request tracing — trace ID at the boundary
 
-Per-request trace ID. Attach in middleware, propagate through downstream calls, surface in response headers:
+**Principle.** Every request carries a trace ID, attached at the middleware boundary, propagated through downstream calls, surfaced in response headers.
+
+**Why.** When something breaks at a customer, the trace ID is what unblocks the support conversation — the customer sees the ID in a response header, the engineer greps it across logs. Without the ID, support becomes "approximately when did this happen?" and "can you reproduce?" — both expensive questions. The cost is one middleware function; the savings are every incident.
+
+**Recipe.**
 
 ```py
 @app.middleware("http")
@@ -135,9 +173,15 @@ async def trace_middleware(request: Request, call_next):
     return response
 ```
 
-When something breaks at a customer, the trace ID is what unblocks the support conversation. Log it everywhere.
+Log it everywhere. See `factory-observability.md` for the broader observability frame.
 
-## Activity / audit logging — fire-and-forget at the mutation boundary
+## Audit logging at the mutation boundary — fire-and-forget
+
+**Principle.** Audit logs never block the mutation. Log delivery is best-effort; surface failures to ops, not to users.
+
+**Why.** Same principle as `factory-api.md §audit logging at mutation boundary` and `factory-data-layer.md §activity log table`. Awaiting the audit log makes one slow log call into one slow mutation.
+
+**Recipe.**
 
 ```ts
 export async function updateFoo(input: FooUpdateInput) {
@@ -151,26 +195,6 @@ export async function updateFoo(input: FooUpdateInput) {
   return updated;
 }
 ```
-
-Audit logs should never fail the user's action. Log delivery is best-effort; surface failures to ops, not to users.
-
-## What NOT to do
-
-- **Don't decrypt sensitive fields at API boundaries "just in case."** Decrypt at the specific handler that actually returns plaintext; mask everywhere else.
-- **Don't expose the admin client as a top-level import.** Wrap in `withAdmin()` so the auth check is unavoidable.
-- **Don't ship a feature without a review queue if it mutates customer data.** Vibe-coding incidents (Base44, Replit prod-DB wipe, Cursor RCE) are public examples of why.
-- **Don't use in-memory rate limiting in production on serverless.** It silently doesn't work across instances.
-- **Don't log raw PII or payloads.** Log actions and IDs; if you need the payload to debug, redact at the logger layer.
-- **Don't hardcode allowlists.** Move to a DB table the moment there's a second entry.
-- **Don't fail mutations on audit-log delivery.** Fire-and-forget; surface failures to ops.
-
-## Pitfalls referenced
-
-- **In-memory rate limiter shipped to prod** acknowledged-in-comment-but-not-fixed (kairos). Migrate to Upstash before scaling.
-- **BAA comment instead of runtime check** in the email helper (kairos). Promote to assertion.
-- **Hardcoded email allowlist** (encode/monorepo). DB-backed members table from the start.
-- **Admin client at module scope** is easy to misuse. Always wrap.
-- **No auth at all** in an internal-tool repo (ford-analysis: every procedure is `publicProcedure`). Even single shared password is better than nothing.
 
 ## Source patterns
 

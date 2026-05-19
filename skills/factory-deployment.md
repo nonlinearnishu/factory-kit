@@ -5,7 +5,11 @@ description: Deployment and infrastructure conventions across builds. Vercel + N
 
 # Factory deployment
 
+Most of this skill is Recipe — deployment is where stack-specific decisions are the substance, not the surface. The few load-bearing principles (one service per entry point, migrations in CI, boot-time assertions, single-tenant customer-cloud as the commercial wedge) lead their sections; the rest are marked `Recipe only`.
+
 ## Web — Vercel + Neon
+
+**Recipe only** — stack pick.
 
 | Aspect | Choice |
 |---|---|
@@ -15,6 +19,14 @@ description: Deployment and infrastructure conventions across builds. Vercel + N
 | Env vars | Vercel project + `t3-oss/env-nextjs` Zod validation |
 | Preview safety | Boot-time assertion: `VERCEL_ENV=preview` MUST NOT use prod `DATABASE_URL` |
 
+## Boot-time assertions for configuration safety
+
+**Principle.** Configuration mistakes that could cause data loss or cross-environment writes fail loud at boot.
+
+**Why.** A misconfigured preview deployment that connects to prod is the silent kind of incident — preview writes look like real writes, no error fires, the data contaminates for days. A boot-time assertion that compares `VERCEL_ENV` against `DATABASE_URL` makes the misconfiguration instant and visible. Three lines of code; one prevented incident pays for them many times over.
+
+**Recipe.**
+
 ```ts
 // src/db/index.ts — boot-time assertion
 const isPreview = process.env.VERCEL_ENV === 'preview';
@@ -23,16 +35,18 @@ if (isPreview && process.env.DATABASE_URL === process.env.PROD_DATABASE_URL) {
 }
 ```
 
-## Python services — Cloud Run
+## One Cloud Run service per Python entry point
 
-One Cloud Run service **per Python entry point** (see `factory-data-pipelines.md` for the three-entry-point pattern):
+**Principle.** Each Python entry-point variant (CLI, API, Pub/Sub) gets its own Cloud Run service with its own Dockerfile.
+
+**Why.** Sharing a service across entry points means the startup command is conditional — `if mode == 'api' run uvicorn; else run pubsub-handler` — which makes the service definition impossible to validate at deploy time. Separate services have separate Dockerfiles, separate startup commands, separate scaling configurations. The cost is more Cloud Run services; the benefit is each one is independently deployable, scalable, and debuggable.
+
+**Recipe.**
 
 | Service | Entry point | Trigger |
 |---|---|---|
 | `myservice-api` | `main_api.py` (FastAPI) | HTTP request |
 | `myservice-pubsub` | `main_pubsub.py` (handler) | Pub/Sub topic |
-
-Separate Dockerfiles for each. They share `src/` but the startup command differs.
 
 ```dockerfile
 # Dockerfile.api
@@ -63,6 +77,12 @@ CMD ["uv", "run", "python", "main_pubsub.py"]
 Non-root user; `PYTHONUNBUFFERED=1` for log streaming.
 
 ## GitHub Actions — ephemeral DBs + matrix deploy
+
+**Principle.** Every PR gets a real ephemeral database via Neon branch; production data and dev data never mix in test pipelines.
+
+**Why.** Shared dev DBs are a constant source of false test failures — a parallel PR mutated the schema, another test left stale rows, the test that "always passed" suddenly doesn't. Ephemeral per-PR DBs eliminate the shared state: each PR's tests run against a clean branch off main, deleted on PR close. The cost is one Neon project; the benefit is test reliability.
+
+**Recipe.**
 
 ```yaml
 # .github/workflows/ci-cd.yml (sketch)
@@ -117,9 +137,13 @@ jobs:
       - run: gcloud run deploy ${{ matrix.service }} --source ./models/myservice ...
 ```
 
-Ephemeral Neon branch per PR is the entire point — every PR gets a real DB without polluting prod or sharing dev. After the PR closes, delete the branch.
+## Env vars — validate at build with Zod
 
-## Env vars — `t3-oss/env-nextjs`
+**Principle.** Env vars are validated against a Zod schema at build time; the build fails if any required var is missing or wrong-shaped.
+
+**Why.** Missing env vars surface at runtime as `undefined` reads — sometimes the page renders blank, sometimes a server action throws a cryptic error, sometimes auth silently degrades. Build-time validation makes the missing var fail at deploy, before any user sees the symptom. `t3-oss/env-nextjs` is the discriminated client/server split that keeps client bundles from leaking secrets.
+
+**Recipe.**
 
 ```ts
 // src/env.js
@@ -141,14 +165,11 @@ export const env = createEnv({
 });
 ```
 
-Build fails if env vars are missing or wrong-shaped. Don't ship past the build error.
+Don't ship past the build error.
 
 ## Terraform — when AWS / compliance is in scope
 
-Use when:
-- Customer requires single-tenant deployment in their cloud (HIPAA, FDA 21 CFR 820, SOC 2 Type II)
-- AWS RDS (vs Neon) for compliance posture
-- Need IaC for VPCs, security groups, KMS keys, IAM roles
+**Recipe only** — pick when single-tenant customer-cloud deployment is the model. Use the environments/modules layout below; per-env values in `terraform.tfvars`, never hardcoded in `main.tf`.
 
 ```
 infra/terraform/
@@ -167,11 +188,18 @@ infra/terraform/
     └── secrets/            # KMS, Secrets Manager
 ```
 
-`environments/<env>/main.tf` consumes modules; `terraform.tfvars` supplies the per-env values. Don't put hardcoded prod values in `main.tf`.
+Pick when:
+- Customer requires single-tenant deployment in their cloud (HIPAA, FDA 21 CFR 820, SOC 2 Type II)
+- AWS RDS (vs Neon) for compliance posture
+- Need IaC for VPCs, security groups, KMS keys, IAM roles
 
-## RDS IAM authentication
+## RDS IAM authentication — no long-lived passwords
 
-For AWS RDS (Postgres / MySQL), use IAM authentication — no long-lived passwords:
+**Principle.** When AWS RDS is the database, use IAM authentication; never long-lived passwords in env vars.
+
+**Why.** A long-lived DB password in an env var is a credential that can leak via logs, build artifacts, or a misconfigured secrets manager — and a leaked password is valid until rotated, which requires coordinated downtime. IAM tokens rotate every 14 minutes; a leaked token expires before exploitation is practical. The cost is a token-fetch helper and a refresh loop; the benefit is a credential-leak failure mode that bounds the blast radius.
+
+**Recipe.**
 
 ```ts
 // src/db/rds-auth.ts
@@ -189,9 +217,15 @@ async function getToken(): Promise<string> {
 }
 ```
 
-Token rotates every 14 minutes; cache and refresh near expiry. Pair with lazy DB singleton (`Proxy`-wrapped) so connections only open after IAM token is fetched.
+Token rotates every 14 minutes; cache and refresh near expiry. Pair with a lazy DB singleton (`Proxy`-wrapped) so connections only open after IAM token is fetched.
 
 ## Migrations — CI, never runtime
+
+**Principle.** Migrations run in CI against an ephemeral branch DB or on a CI step before deploy; never at application startup.
+
+**Why.** Same principle as `factory-data-layer.md §migrations — CI, not runtime`. Runtime migrations turn deployment into a database operation — slow boots, half-migrated states on failure, rollback-deploy-without-rollback-schema. CI migrations keep schema changes a separate gate.
+
+**Recipe.**
 
 ```sh
 # Local dev — schema push (fast iteration)
@@ -207,11 +241,17 @@ drizzle-kit migrate
 drizzle-kit migrate
 ```
 
-**Never put `drizzle-kit migrate` in a Cloud Run `CMD` or Vercel build step.** Migrations are CI's job, not runtime's.
+**Never put `drizzle-kit migrate` in a Cloud Run `CMD` or Vercel build step.**
 
-## Single-tenant customer-cloud deployment (the factory thesis)
+**Failure mode.** Migrations in Cloud Run startup → 30-second cold starts; if a migration fails mid-startup, the service is in a broken half-migrated state with no clean recovery.
 
-For compliance-sensitive customers (medical device, healthcare, regulated finance):
+## Single-tenant customer-cloud — the commercial wedge
+
+**Principle.** For compliance-sensitive customers, deploy a single-tenant container into the customer's cloud; the factory is the substrate, not the host.
+
+**Why.** Multi-tenant SaaS is incompatible with the compliance postures that high-value verticals require (HIPAA, FDA 21 CFR 820, SOC 2 Type II as a control, not as a marketing badge). Single-tenant customer-cloud lets the customer own data residency, secrets, and access — which makes their compliance officer's review fast — while the factory ships updates as pinned tags of the kit's repo. The trade-off vs SaaS: more per-customer onboarding, no shared infrastructure economies. The trade-off vs custom-built: dramatically less per-customer cost.
+
+**Recipe.**
 
 | Aspect | Choice |
 |---|---|
@@ -221,23 +261,7 @@ For compliance-sensitive customers (medical device, healthcare, regulated financ
 | Secrets | Customer's AWS Secrets Manager / GCP Secret Manager — never in the factory repo |
 | Updates | Customer pulls a new pinned tag of the factory-kit repo |
 
-This is the differentiator vs. SaaS competitors (Retool, Superblocks). Customer data never leaves their cloud. The factory is the substrate, not the host.
-
-## What NOT to do
-
-- **Don't run migrations at runtime.** CI's job.
-- **Don't share Cloud Run services across entry points.** Separate service per entry-point variant.
-- **Don't hardcode prod values in Terraform `main.tf`.** Use `terraform.tfvars` per environment.
-- **Don't use long-lived passwords for AWS RDS.** IAM authentication.
-- **Don't skip the preview-DB boot-time assertion.** Configuration mistakes should fail loud at boot.
-- **Don't store customer secrets in the factory-kit repo.** Customer's cloud, customer's secrets manager.
-- **Don't ship Docker images as root.** Always non-root user.
-- **Don't deploy unbuffered Python without `PYTHONUNBUFFERED=1`.** Logs won't stream.
-
-## Pitfalls referenced
-
-- **Migrations at Cloud Run startup** → 30-second cold start, brittle if migration fails mid-startup. CI is the right place.
-- **No preview-DB safety check** → preview deployment silently writes to prod.
+This is the differentiator vs. SaaS competitors (Retool, Superblocks). Customer data never leaves their cloud.
 
 ## Source patterns
 

@@ -5,7 +5,15 @@ description: Auth and authorization conventions distilled across builds with thr
 
 # Factory auth
 
-## Provider pick — decision matrix
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the shape we use), and **Failure mode** when there's one to name. Sections that are pure style with no deeper truth are marked `Recipe only`. Editors: if the Principle could appear unchanged in any auth tutorial, sharpen the Why with a Factory-specific observation or drop the section to Recipe only.
+
+## Provider pick — match the authz model, not the familiarity
+
+**Principle.** Pick the provider whose model matches your authz shape; don't fight the provider for features it isn't built for.
+
+**Why.** Auth providers differ in what they make easy. Better Auth is org-shaped (teams, roles, invitations). Supabase Auth + RLS is row-shaped (per-row policy reasoning). Clerk is consumer-shaped (managed UI, social login). Picking the wrong shape means every authz feature is upstream — you're rebuilding the provider's missing model. The wrapper interface below makes provider a swap point, so the cost of getting this wrong is bounded — but you still pay the swap.
+
+**Recipe.**
 
 | Provider | Pick when |
 |---|---|
@@ -13,9 +21,13 @@ description: Auth and authorization conventions distilled across builds with thr
 | **Supabase Auth + RLS** | RLS is doing real work — multi-role partner/distributor model, deeply branched authz at row level. Project already commits to Supabase. |
 | **Clerk** | Consumer / SSO-heavy. Managed auth UI components matter. Org features secondary. |
 
-The wrapper interface is the same regardless. Provider is a swap point, not a leak.
+## The wrapper interface — the single seam
 
-## The wrapper interface — single seam
+**Principle.** The wrapper is the seam; the provider is swappable behind it.
+
+**Why.** Every server action and API route calls auth. If they call the provider's SDK directly, swapping providers means touching every action. The wrapper concentrates the provider dependency in one file — `requireAuth`, `requireRole`, `withOrgContext` — and gives the call sites a stable interface that doesn't depend on which SDK is underneath. The cost is three small wrapper functions; the savings are linear in the number of mutations the project will ever have.
+
+**Recipe.**
 
 ```ts
 // src/lib/auth/index.ts
@@ -43,7 +55,11 @@ export async function withOrgContext<T>(
 
 Every server action / API route uses these — never the provider directly. When you swap providers, only the body of these wrappers changes.
 
+**Failure mode.** Cothon stacked three fallback auth paths: JWT → extension token → X-User-ID. Three things to test, three places to break, no single seam to swap.
+
 ## Procedure tier stacking (tRPC)
+
+**Recipe only** — style decision. The principle (stack tiers by extension) lives in `factory-api.md §procedure tiers — stacked`.
 
 ```ts
 export const publicProcedure = t.procedure;                          // anyone
@@ -54,6 +70,12 @@ export const orgProcedure = protectedProcedure.use(requireOrg);      // authed +
 For server actions, the equivalent is the wrapper functions above called at the top of each action.
 
 ## Better Auth — plugin composition
+
+**Principle.** Use the official plugin when one exists; don't write your own auth adapter.
+
+**Why.** The maintenance gradient on auth code is steep — every upstream release brings security fixes, every CVE means tracking patches. The official plugin gets those for free; a custom adapter doesn't. The "we know our needs better than the maintainers" framing reliably costs more than the supposed flexibility saves.
+
+**Recipe.**
 
 ```ts
 // src/lib/auth.ts
@@ -73,7 +95,15 @@ export const auth = betterAuth({
 
 Custom access control via `accessControl` — define resource/action permissions explicitly, not roles inline.
 
-## Org-scoped middleware
+**Failure mode.** Encode/monorepo wrote a custom NextAuth Postgres adapter when an official one existed; spent weeks tracking schema drift before deleting it in favor of the official adapter.
+
+## Org-scoped multi-tenancy
+
+**Principle.** Every domain table has an `orgId` FK with cascade delete, and every query filters by it via middleware-supplied context — both layers, never just one.
+
+**Why.** A cross-tenant data leak is the worst auth bug — usually invisible at write time, only surfaced when a customer sees another customer's data. Defense in depth means schema enforces (FK with cascade), middleware enforces (query filter from context), and application code can't accidentally drop the filter (the filter comes from context, not from a parameter the caller chose).
+
+**Recipe.**
 
 ```ts
 const requireOrg = async (opts: { ctx: Context }) => {
@@ -89,7 +119,7 @@ Every domain table has an `orgId` (or `workspaceId` / `projectId`) FK with `onDe
 
 ## Auto-select organization
 
-If the user belongs to exactly one org, auto-activate it on login. Custom hook on the client side:
+**Recipe only** — UX nicety. If the user belongs to exactly one org, auto-activate it on login.
 
 ```ts
 export function useAutoSelectOrganization() {
@@ -105,7 +135,13 @@ export function useAutoSelectOrganization() {
 
 Spares the user a meaningless click on the first session.
 
-## Supabase RLS — when RLS earns its keep
+## RLS — only when authz branches on row content
+
+**Principle.** Row-level security earns its keep only when authz branches on row content, not just on user identity.
+
+**Why.** RLS adds per-query latency and is hard to debug — policy logic lives in Postgres, far from the call site. The tradeoff pays off when authz rules genuinely require row-level reasoning (distributor sees only their facilities; rep sees only assigned territories). For "user belongs to org," middleware-supplied filters are faster, simpler, and testable in TypeScript. Defaulting to RLS for simple multi-tenancy is paying a complexity tax that doesn't deliver.
+
+**Recipe.**
 
 For multi-role surfaces where the same query needs different behavior per audience (admin sees all, owner sees own distributor, rep sees facilities they have access to):
 
@@ -113,11 +149,13 @@ For multi-role surfaces where the same query needs different behavior per audien
 - API layer is **auth-context-agnostic** — `listCasesWith(client)` takes a Supabase client, gets reused by admin queries (admin client, RLS bypassed) and RLS-scoped queries (anon/user client, RLS active)
 - Auto-generated types via `supabase gen types typescript` — the schema is the source of truth
 
-The trade-off: RLS adds latency on every query, and complex policies are hard to debug. Use only when the multi-role split is the dominant concern.
+## JWT signature verification
 
-## Clerk — JWT verification + fallback user-linking
+**Principle.** Verify the JWT signature on every request; never trust unsigned claims.
 
-Clerk uses RS256-signed JWTs. Verify the signature on every API request — never trust unsigned claims:
+**Why.** An unsigned JWT is a string the client controls. Trusting the `sub` claim without verification is trusting the client to say who they are. The cost of verification is one JWKS fetch (cached) per request; the cost of not verifying is the entire auth model.
+
+**Recipe.**
 
 ```py
 def verify_clerk_token(token: str) -> ClerkUser:
@@ -126,7 +164,13 @@ def verify_clerk_token(token: str) -> ClerkUser:
     return ClerkUser(**payload)
 ```
 
-If your webhook hasn't arrived but the user has a valid token, create the user record inline on first request. Don't 404 valid users:
+## Fallback user-linking on first valid token
+
+**Principle.** Create the user record inline on first valid-token request; don't depend on webhook arrival.
+
+**Why.** Webhook delivery is best-effort — Clerk (or any provider) can deliver minutes late or not at all. If the application 404s a valid-token user while waiting for the webhook, the user sees a broken state for an unbounded amount of time. The signature verification establishes the user is real; the application can create the record on demand and let the webhook upsert later.
+
+**Recipe.**
 
 ```py
 async def get_or_create_user(clerk_user: ClerkUser) -> User:
@@ -136,7 +180,13 @@ async def get_or_create_user(clerk_user: ClerkUser) -> User:
     return await create_user_from_clerk(clerk_user)
 ```
 
-## OAuth callback safety
+## OAuth callback safety — `safeNext`
+
+**Principle.** Validate any redirect URL that comes from a query param; never trust the input.
+
+**Why.** Open-redirect is a recurring bug class. The attacker crafts a link with `?next=https://evil.com`; the redirect handler trusts it; the user lands on a phishing page after a successful OAuth handshake — the trust signal is the worst possible. The defense is a small allowlist that rejects protocol-relative URLs, absolute URLs, and anything that isn't an in-app path.
+
+**Recipe.**
 
 ```ts
 function safeNext(next: string | null): string {
@@ -154,7 +204,7 @@ Apply in `/auth/callback`, login, signup-complete, magic-link-redirect — anywh
 
 ## Role-conditional post-login redirect
 
-Don't hardcode `/dashboard`. Look up the user's role and redirect:
+**Recipe only** — routing detail. Don't hardcode `/dashboard`; look up role and redirect.
 
 ```ts
 const profile = await getProfile(user.id);
@@ -163,7 +213,13 @@ if (profile.role === 'rep') return redirect('/submit');
 return redirect('/');
 ```
 
-## Admin client bypass — always wrapped
+## Admin client — always wrapped
+
+**Principle.** An admin client never lives at module scope; always behind a wrapper that re-checks privilege.
+
+**Why.** An admin client at module scope is a loaded gun — any code path that imports the module inherits the bypass. The wrapper forces the privilege check at every call site, which is the right place for it: the check is co-located with the privilege use, and the type system rejects callers who haven't gone through the wrapper.
+
+**Recipe.**
 
 ```ts
 // src/lib/supabase/admin.ts
@@ -173,26 +229,30 @@ export async function withAdmin<T>(fn: (admin: AdminClient) => Promise<T>): Prom
 }
 ```
 
-Never export `createAdminClient` at the module top level — only behind `withAdmin`. See `factory-security.md`.
+Never export `createAdminClient` at the module top level — only behind `withAdmin`. See `factory-security.md` on the same pattern for service-role keys.
 
-## What NOT to do
+**Failure mode.** Module-scope `adminClient` export imported by a handler that should have used the user-scoped client — a cross-tenant write that bypassed RLS, undetected for weeks.
 
-- **Don't hardcode email allowlists.** Move to a DB-backed members table from the start. Allowlist-in-config doesn't scale.
-- **Don't put auth logic inline in routes.** Always through the wrapper interface.
-- **Don't expose admin/service-role clients at module scope.** Wrap.
-- **Don't stack three fallback auth paths** (e.g. JWT → session token → header fallback). Pick one provider per surface.
-- **Don't trust unsigned JWT claims.** Always verify the signature.
-- **Don't 404 valid users when the webhook hasn't arrived.** Fallback user-linking.
-- **Don't skip `safeNext` validation on redirect params.** Open-redirect is a recurring bug class.
-- **Don't put RLS in front of admin/internal queries.** Use the admin client for them (wrapped).
+## Auth from day one, even with a shared password
 
-## Pitfalls referenced
+**Principle.** Every endpoint authenticates from day one, even if every user shares a password.
 
-- **Hardcoded email allowlist** for auth (encode/monorepo). Doesn't scale.
-- **Triple-fallback auth surface** (cothon: Clerk → extension token → X-User-ID). Three things to test, three places to break.
-- **Admin client at module scope.** Always wrap.
-- **No auth at all** (ford-analysis: every procedure `publicProcedure`). Even single shared password is better.
+**Why.** "We'll add auth later" reliably becomes "every procedure is `publicProcedure`" and ships to production that way. The cheapest auth surface (one shared password, one allowlist, one Bearer token) is infinitely better than none, because it forces every new endpoint to fit a pattern that expects auth. Retrofitting auth means walking every endpoint; pre-fitting auth means filling in the body.
+
+**Recipe.** Even a single `requireAuth` that just checks an env-var token, attached to every procedure or wrapped around every server action, satisfies the principle. The point is the discipline, not the cryptographic strength.
+
+**Failure mode.** Ford-analysis defined every tRPC procedure as `publicProcedure` with the plan to add auth later. Three procedures shipped without auth before someone caught it during a security review.
+
+## Hardcoded email allowlists
+
+**Principle.** Members live in a database table from day one; never hardcode the allowlist in config.
+
+**Why.** A hardcoded allowlist is a deploy-to-add-a-user system. It shifts a user-management problem onto the deployment pipeline, which makes it slow and gated on engineering. A DB-backed members table is a query-to-add-a-user system, and from day one supports the admin UI that's coming anyway.
+
+**Recipe.** A `members` table keyed by `orgId` + `userId` (or email if invitation flow). Add/remove via mutation, not via config change.
+
+**Failure mode.** Encode/monorepo started with a NextAuth email allowlist in config. By week six, every new user was a deploy.
 
 ## Source patterns
 
-Kairos (Supabase Auth + RLS, multi-role partner-distributor, auth-context-agnostic API, `safeNext`, role-conditional redirect, admin client wrapping, RowActions auth gating), duezy (Better Auth + organization plugin, session timeout provider, custom org-based ACL, dual mode forms with auth context), fleet-advisor (procedure tier stacking, Better Auth plugin composition, auto-select organization), cothon (Clerk JWT verification with fallback user-linking, context propagation via request.state, multi-tenant context dataclasses), encode/monorepo (NextAuth allowlist anti-pattern).
+Kairos (Supabase Auth + RLS, multi-role partner-distributor, auth-context-agnostic API, `safeNext`, role-conditional redirect, admin client wrapping, RowActions auth gating), duezy (Better Auth + organization plugin, session timeout provider, custom org-based ACL, dual mode forms with auth context), fleet-advisor (procedure tier stacking, Better Auth plugin composition, auto-select organization), cothon (Clerk JWT verification with fallback user-linking, context propagation via request.state, multi-tenant context dataclasses), encode/monorepo (NextAuth allowlist anti-pattern, custom adapter anti-pattern).

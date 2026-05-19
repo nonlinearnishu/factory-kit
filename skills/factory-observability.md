@@ -5,7 +5,15 @@ description: Observability conventions across builds. PostHog + Sentry on day on
 
 # Factory observability
 
-## Day-one stack — non-negotiable
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the PostHog / Sentry / pino / structlog shape we use), and **Failure mode** when there's one to name.
+
+## Day-one stack — observability before features
+
+**Principle.** PostHog + Sentry + trace IDs + structured logs go in on day one, before the first feature ships.
+
+**Why.** Observability is the build's most asymmetric cost-vs-value: cheap on day one (an SDK install and a config block), expensive to backfill (every event needs a redeploy, session-replay data starts empty, six months of usage history is lost). The trap is treating it as "we'll add when we need it" — by the time you need it, the data you'd want doesn't exist.
+
+**Recipe.**
 
 | Layer | Tool | Purpose |
 |---|---|---|
@@ -15,9 +23,13 @@ description: Observability conventions across builds. PostHog + Sentry on day on
 | Request tracing | Trace ID middleware + logs | Cross-service debugging |
 | Structured logs | `pino` (Node) / `structlog` (Python) | Searchable, machine-parseable |
 
-Adding these later is several weeks of work each. Add them on day one even when the project feels too small to need them.
+## PostHog — client setup with ingest rewrite
 
-## PostHog — client setup
+**Principle.** PostHog ingest goes through your own domain via Next.js rewrites; ad-blockers drop direct PostHog calls.
+
+**Why.** Browser-level ad-blockers (uBlock, Brave's shield) recognize `i.posthog.com` and drop ~30% of events in aggregate. Routing through `/ingest` on your own domain bypasses the blocklist — the events arrive, the analytics are accurate. The cost is one rewrite block; the savings are ~30% of every funnel calculation you'll ever do.
+
+**Recipe.**
 
 ```tsx
 // src/components/PostHogProvider.tsx
@@ -50,11 +62,13 @@ async rewrites() {
 }
 ```
 
-Without the rewrite, browser-level ad-blockers drop ~30% of events. Worth the 10-minute setup.
+## Event tagging — feature + surface, always
 
-## Event tagging — tool/feature attribution
+**Principle.** Every event carries a `feature` and `surface` tag; per-feature usage queries depend on it.
 
-Tag every event with the surface that emitted it:
+**Why.** Six months in, the question is "which features earn their maintenance cost?" That question is a `GROUP BY feature` away if the events are tagged, and a complete loss if they're not. Tagging on every event is one extra line; not tagging is a year of usage data that can't be sliced.
+
+**Recipe.**
 
 ```ts
 posthog.capture('customer_created', {
@@ -65,9 +79,15 @@ posthog.capture('customer_created', {
 });
 ```
 
-Later, "how often is X used per org?" becomes a query, not a manual count. This is the long-term play — usage data compounds.
+Later: `SELECT feature, count(*) FROM events GROUP BY feature ORDER BY 2 DESC` is the answer to "which features earn their maintenance cost?"
 
-## Sentry — Next.js + Python
+## Sentry — exception capture with user scope after auth
+
+**Principle.** Exceptions are scoped to the user that triggered them; user context is attached after auth, not before.
+
+**Why.** An exception without user context is a haystack — "something broke for someone." With user context, the same exception is "this broke for user X, here's their session." Attaching context after auth (rather than at module init) keeps anonymous traffic anonymous in the error stream and identified traffic identified.
+
+**Recipe.**
 
 ```ts
 // sentry.client.config.ts / sentry.server.config.ts
@@ -92,11 +112,13 @@ sentry_sdk.init(
 )
 ```
 
-User context attached after auth, so exceptions are scoped to the user that triggered them.
+## Trace ID — propagate, don't regenerate
 
-## Trace ID middleware
+**Principle.** Every request carries a trace ID; if the caller sent one, propagate it; if not, generate it. Always echo it in the response.
 
-Every request gets a `x-request-id`. If incoming, propagate. If not, generate:
+**Why.** Trace IDs lose half their value if they break across service boundaries. A request that hits Next.js → Cloud Run service A → Cloud Run service B should carry the same ID through all three. Regenerating at each hop means the support engineer has three IDs to align manually; propagating means the IDs alignment for free.
+
+**Recipe.**
 
 ```py
 # Python / FastAPI
@@ -119,9 +141,17 @@ export function middleware(req: NextRequest) {
 }
 ```
 
-Log the request ID with every structured log line. When a customer reports a bug, the trace ID is what unblocks the support conversation.
+Log the request ID with every structured log line.
 
-## Structured logging
+**Failure mode.** Generating a new trace ID at every service hop — cross-service debugging requires manual log alignment, and the support conversation becomes "approximately what time?"
+
+## Structured logging — never `console.log` strings
+
+**Principle.** Every log line is a structured record (JSON or equivalent); never raw string concatenation.
+
+**Why.** A grep over `pino` JSON logs lets you filter by `user_id`, `action`, `request_id`, `duration_ms`. A grep over string-concatenated logs is "did the substring match?" — every new query is a new regex, no aggregation is possible. The cost of structured logging is one logger import; the benefit is every future incident investigation.
+
+**Recipe.**
 
 ```ts
 // Node — pino
@@ -143,9 +173,13 @@ log = structlog.get_logger().bind(service='fleetsim')
 log.info('simulation_started', request_id=request_id, fleet_id=fleet_id)
 ```
 
-**Never `console.log` raw strings.** Structured logs are searchable; string-concat is grep-only.
+## Activity log — DB-backed audit trail, fire-and-forget
 
-## Activity log — DB-backed audit trail
+**Principle.** Audit logging at the mutation boundary is fire-and-forget; same principle as the API layer.
+
+**Why.** See `factory-api.md §audit logging at mutation boundary` and `factory-data-layer.md §activity log table`.
+
+**Recipe.**
 
 ```ts
 // fire-and-forget — never blocks mutations
@@ -168,6 +202,8 @@ Schema in `factory-data-layer.md`. Use for regulatory compliance, support invest
 
 ## What to log
 
+**Recipe only** — the inclusion list.
+
 - **Actions and IDs**: `{ user_id: 'u_xyz', action: 'updated_ssn', subject_id: 'c_abc' }`
 - **Request context**: trace ID, user agent (high-level), feature/surface tag
 - **Counts and durations**: `{ duration_ms: 142, rows_affected: 3 }`
@@ -175,43 +211,16 @@ Schema in `factory-data-layer.md`. Use for regulatory compliance, support invest
 
 ## What NOT to log
 
+**Principle.** Log actions and IDs, never payloads. PII in logs creates compliance scope creep.
+
+**Why.** Same principle as `factory-security.md §logging — log actions and IDs, not payloads`. Once payloads with PII land in the log stream, the log stream inherits the PII's protection requirements.
+
+**Recipe.** Don't log:
+
 - **Raw PII / PHI payloads**: full SSN, government IDs, financial account numbers
 - **Auth tokens / API keys**: at any layer, ever
 - **Full request bodies**: redact at the logger layer if you need to debug
 - **Decrypted ciphertext**: see `factory-security.md`
-
-PII in logs creates compliance scope creep — logs end up needing the same protection as the source database.
-
-## Per-tool usage queryability — the long play
-
-Per Obsidian software-factories note: tag events by tool/feature so per-tool usage is queryable later. This is the layer-10 (observability) commitment that pays off when you have a year of data and want to know "which features are dead?"
-
-Concretely: every PostHog event has a `feature` property and a `surface` property. Don't skip this even on a one-off project.
-
-```ts
-posthog.capture(eventName, {
-  feature,        // which factory feature this is part of
-  surface,        // which screen / drawer / table
-  // ... domain props
-});
-```
-
-Six months later: `SELECT feature, count(*) FROM events GROUP BY feature ORDER BY 2 DESC` is the answer to "which features earn their maintenance cost?"
-
-## What NOT to do
-
-- **Don't ship without PostHog + Sentry.** Even prototypes. Adding later is weeks of work.
-- **Don't skip the PostHog ingest rewrite.** Ad-blockers drop ~30% of events otherwise.
-- **Don't `console.log` strings.** Structured logs only.
-- **Don't await audit log writes on the mutation critical path.** Fire-and-forget.
-- **Don't log raw PII or full payloads.** Compliance scope creep.
-- **Don't skip the feature/surface tags on events.** Without them, "which features are used?" is unanswerable later.
-- **Don't generate new trace IDs when one was sent in.** Propagate.
-
-## Pitfalls referenced
-
-- **No trace IDs across services** → cross-service debugging requires manual log alignment. Middleware on day one.
-- **PII in logs** → compliance scope expands to include log storage. Redact at logger layer.
 
 ## Source patterns
 

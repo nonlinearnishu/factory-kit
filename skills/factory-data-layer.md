@@ -5,7 +5,15 @@ description: Database schema, ORM, and migration conventions across builds. Driz
 
 # Factory data layer
 
-## ORM pick — decision matrix
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the Drizzle / Postgres shape we use), and **Failure mode** when there's one to name. Sections that are pure style with no deeper truth are marked `Recipe only`.
+
+## ORM pick — match the data shape, not the comfort
+
+**Principle.** Use the ORM whose abstractions match your schema's shape; don't escape to raw SQL by default.
+
+**Why.** Raw SQL with hand-mapped row-to-object code is verbose, error-prone, and gives the type system nothing to check. An ORM with `$inferSelect`-style derivation means the schema *is* the type — one source of truth, one place to refactor. The cost of an ORM is one query DSL to learn; the cost of raw SQL is every hand-written mapper and every silent type drift.
+
+**Recipe.**
 
 | ORM | Pick when |
 |---|---|
@@ -14,9 +22,15 @@ description: Database schema, ORM, and migration conventions across builds. Driz
 | **SQLAlchemy (Python)** | Python service with relational data. Use with soft-delete mixin. |
 | **Raw `pg`** | Never for new projects. Migrate if encountered. |
 
+**Failure mode.** Encode/monorepo used raw `pg` with hand-mapped row-to-object code. Every new query meant another mapper, and the types drifted from the schema on every migration.
+
 ## Domain-partitioned schema modules
 
-Don't put the whole schema in one file. Partition by domain:
+**Principle.** Partition schema files by domain; one mega-schema file ages worse than one file per domain.
+
+**Why.** A 2,000-line `schema.ts` is unreadable, ungreppable, and a merge-conflict factory. Domain partitioning means a feature change touches one file, a domain audit reads one file, and the import paths name the domain. The cost is one extra directory and one re-export index; the benefit is linear in the schema's growth.
+
+**Recipe.**
 
 ```
 src/server/db/schemas/
@@ -27,9 +41,13 @@ src/server/db/schemas/
 └── index.ts             # re-exports all
 ```
 
-Each file is independently grep-able and reviewable.
-
 ## `_shared.ts` — table creator + timestamps
+
+**Principle.** Reusable schema primitives live in `_shared.ts`; never copy-paste `createdAt`/`updatedAt` into every table.
+
+**Why.** Timestamps and the table-name prefix are universal — every table needs them, and they need to agree. Defining them once in `_shared.ts` means a change to "when does `updatedAt` fire?" is one diff, not 40. The `pgTableCreator` prefix lets the schema coexist with other apps in the same database (a small thing until you're sharing a Neon project across two services).
+
+**Recipe.**
 
 ```ts
 import { pgTableCreator, timestamp } from 'drizzle-orm/pg-core';
@@ -55,25 +73,35 @@ export const customers = pgTable('customers', {
 });
 ```
 
-## Multi-tenancy keys — universal FK with cascade delete
+## Multi-tenancy keys — cascade delete on every domain table
 
-Every domain table has `orgId` (or `workspaceId` / `projectId`) FK with `onDelete: 'cascade'`. Deleting an org cleans up all owned rows automatically.
+**Principle.** Every domain table has the tenant FK (`orgId` / `workspaceId` / `projectId`) with `onDelete: 'cascade'`.
 
-The org middleware (see `factory-auth.md`) injects `orgId` into the request context; every query filters by it.
+**Why.** Org deletion is a real operation — customers churn, free trials expire, GDPR right-to-delete requests arrive. Without cascade, deleting an org leaves orphan rows scattered across every domain table, and the cleanup script becomes its own bug surface. Cascade makes the schema the cleanup engine: one delete at the parent, the children disappear by the constraint, no application code involved.
 
-## Custom attributes as JSONB
+**Recipe.** Every domain table has `orgId` FK with `onDelete: 'cascade'`. The org middleware (see `factory-auth.md`) injects `orgId` into the request context; every query filters by it.
 
-For per-row flexible attributes the schema doesn't know about (customer-specific tags, configurable workflows):
+## Custom attributes as JSONB — only when the field doesn't drive queries
+
+**Principle.** What drives a query gets a real column. What doesn't can live in a JSONB envelope. Never query inside JSONB at app speed.
+
+**Why.** JSONB is tempting because it sidesteps migration cost — add a field, ship. The trap is that "we only need to filter by this once in a while" reliably becomes "this is on the dashboard now." Querying inside JSONB is unindexed and slow; once a column is filterable, promote it. The rule is binary: if a field drives a query, it's a column.
+
+**Recipe.**
 
 ```ts
 customAttributes: jsonb('custom_attributes').$type<Record<string, unknown>>().default({}),
 ```
 
-**Rule:** what drives queries gets a real column. What doesn't drives goes here. Don't query inside JSONB at app speed.
+**Failure mode.** Putting time-series data in JSONB to "avoid the migration" and then querying inside it at dashboard load time — N seconds per page render, no index to fix it.
 
-## Polymorphic table pattern
+## Polymorphic tables — shared base + variant tables
 
-When you have entities that share a base type but diverge (ICE vehicles vs BEV vehicles, individual vs business accounts):
+**Principle.** When entities share most fields but diverge on a few, split into a shared base table plus variant tables; don't accumulate nullable columns.
+
+**Why.** A single table with all-fields-nullable lets the schema represent impossible states (an ICE vehicle with a battery kWh, a BEV with MPG). The base + variants pattern makes those states unrepresentable: each variant table only carries its own fields, and the shared identity lives in the base. Cost: one extra join when you need variant-specific fields. Benefit: the type system enforces what the domain enforces.
+
+**Recipe.**
 
 ```ts
 export const vehicleTypes = pgTable('vehicle_types', {
@@ -97,9 +125,13 @@ export const bevVehicles = pgTable('bev_vehicles', {
 });
 ```
 
-Shared base + variant tables — keeps queries explicit, avoids nullable-column proliferation.
-
 ## Schema-derived type exports
+
+**Principle.** The schema is the source of truth for entity types; never declare entity interfaces by hand.
+
+**Why.** Hand-declared interfaces drift from the schema on every migration — somebody adds a column, forgets the interface, and TypeScript happily accepts the now-incomplete row. Schema-derived types (`$inferSelect`, `InferSelectModel`) re-derive on every build, so the drift is impossible by construction.
+
+**Recipe.**
 
 ```ts
 // src/db/index.ts
@@ -107,9 +139,15 @@ export type CustomerTable = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 ```
 
-Re-export from one entry point. Never define `interface Customer {}` separately — the schema is the source of truth.
+Re-export from one entry point. `InferSelectModel<typeof customers>` is the same thing in different syntax — pick one and use it consistently.
 
-## Soft-delete (Python / SQLAlchemy)
+## Soft-delete — query helper, not memorized convention
+
+**Principle.** If you soft-delete, every read goes through a helper that filters by `deletedAt`. "Remember to add the filter" is a bug waiting to happen.
+
+**Why.** Soft-delete works only if every read respects it. Hand-adding `where(isNull(deletedAt))` to every query means one missed filter ships deleted rows to the user. Wrapping reads in a helper makes the filter the default; opting out requires explicit code, which is the right direction for the asymmetry.
+
+**Recipe.**
 
 ```py
 class SoftDeleteMixin:
@@ -123,18 +161,15 @@ class Customer(Base, SoftDeleteMixin):
 stmt = select(Customer).where(Customer.deleted_at.is_(None))
 ```
 
-For TypeScript / Drizzle: add `deletedAt: timestamp('deleted_at')` and remember to add `where(isNull(table.deletedAt))` to every read. Wrap it in a base query helper if you can.
-
-## InferSelectModel for typed selects
-
-```ts
-import type { InferSelectModel } from 'drizzle-orm';
-type Customer = InferSelectModel<typeof customers>;
-```
-
-Same pattern, different syntax. Use whichever the project consistently uses.
+For TypeScript / Drizzle: add `deletedAt: timestamp('deleted_at')` and wrap reads in a base query helper that applies `where(isNull(table.deletedAt))`.
 
 ## Migrations — CI, not runtime
+
+**Principle.** Migrations run in CI against an ephemeral branch DB; never at application startup.
+
+**Why.** Runtime migrations turn deployment into a database operation — a slow migration blocks the boot, a failed one leaves the app in a half-migrated state, and rolling back a deploy means rolling back the schema (which may have written rows already). CI migrations against an ephemeral DB make the schema change a separate gate; the deploy that follows is just code.
+
+**Recipe.**
 
 ```sh
 # Local dev — apply schema directly during prototyping
@@ -149,13 +184,23 @@ drizzle-kit migrate
 
 Never run migrations at app startup. Never run them inside a Cloud Run container's CMD.
 
-## Migration file naming — one convention, stick
+## Migration file naming — pick one convention
 
-Either timestamps (`20260514_create_customers.sql`) or sequential numbers (`0001_create_customers.sql`). Don't mix `0000_create_simulations.ts` with `add_vehicle_description.ts` — schema evolution order becomes hard to read.
+**Principle.** Pick one migration file-naming convention and never mix.
 
-## Database environment switching (Vercel)
+**Why.** Schema evolution order is the most important property of migration files. Mixing timestamps with sequential numbers (`0000_create_simulations.ts` next to `add_vehicle_description.ts`) makes the order ambiguous — different tools sort them differently, and a developer reading the directory can't tell which came first. Pick one; stick.
 
-For repos that connect to Postgres via Neon and use Vercel preview deployments:
+**Recipe.** Either timestamps (`20260514_create_customers.sql`) or sequential numbers (`0001_create_customers.sql`). Don't mix.
+
+**Failure mode.** Ford-analysis mixed conventions; the next migration created broke prod because the file order on disk didn't match the intended apply order.
+
+## Boot-time assertion: preview ≠ prod DB
+
+**Principle.** Configuration mistakes that could write preview data to the prod DB fail loud at boot.
+
+**Why.** A misconfigured preview deployment that connects to the prod database is the silent kind of incident — preview writes look like real writes, no error fires, the data is contaminated days before anyone notices. A boot-time assertion that checks "preview env, prod DATABASE_URL → crash" makes the mistake instant and visible. The cost is three lines of code; the savings are the cost of the incident that didn't happen.
+
+**Recipe.**
 
 ```ts
 // src/db/index.ts
@@ -167,11 +212,13 @@ if (isPreview && process.env.DATABASE_URL === process.env.PROD_DATABASE_URL) {
 }
 ```
 
-Forces a configuration mistake to fail loud at boot instead of silently writing preview data to prod.
+## ESLint Drizzle rules — enforce WHERE on mutations
 
-## ESLint Drizzle rules
+**Principle.** Mutations without a WHERE clause are bugs; let the linter enforce.
 
-The official `eslint-plugin-drizzle` enforces WHERE clauses on UPDATE/DELETE:
+**Why.** `db.update(customers).set({...})` without `where` updates every row — a five-second outage at best, a customer-facing incident at worst. The error is easy to make and hard to spot in review. The ESLint rule makes it impossible to commit.
+
+**Recipe.**
 
 ```js
 // eslint.config.js
@@ -183,9 +230,13 @@ The official `eslint-plugin-drizzle` enforces WHERE clauses on UPDATE/DELETE:
 }
 ```
 
-Saves you from accidentally `update(customers).set({...})` (without `where`), which would update every row.
+## Activity log table — fire-and-forget
 
-## Activity log table — fire-and-forget at mutation
+**Principle.** The audit log table never blocks the mutation that wrote to it.
+
+**Why.** Audit logs are after-the-fact reconstruction artifacts. If the log insert fails, the mutation succeeded — that's the correct semantics. If the log insert blocks, every mutation is gated on the log table's availability. See `factory-api.md §audit logging at mutation boundary` for the same principle on the API side.
+
+**Recipe.**
 
 ```ts
 export const adminActions = pgTable('admin_actions', {
@@ -206,25 +257,6 @@ export async function logAdminAction(input: NewAdminAction): Promise<void> {
   }
 }
 ```
-
-Never `await` audit-log success on the critical path of a mutation. See `factory-security.md`.
-
-## What NOT to do
-
-- **Don't put the whole schema in one file.** Partition by domain.
-- **Don't `update` or `delete` without `where`.** Use the ESLint rule.
-- **Don't run migrations at runtime.** CI job.
-- **Don't query inside JSONB at app speed.** Promote to column.
-- **Don't mix migration-file naming conventions** in the same project.
-- **Don't define entity types separately.** Use `$inferSelect` / `InferSelectModel`.
-- **Don't skip `onDelete: 'cascade'`** on tenant-keyed FKs. Cleanup is the whole point.
-- **Don't allow preview deploys to write to prod DB.** Boot-time assertion.
-
-## Pitfalls referenced
-
-- **Mixed migration-file naming** (ford-analysis). Pick one and stick.
-- **Raw SQL with hand-mapped row-to-object** (encode/monorepo). Verbose, error-prone, no type inference.
-- **Multiple progress-calculator files** (duezy) accumulating without deletion. When you write a unifier, delete the inputs in the same PR.
 
 ## Source patterns
 

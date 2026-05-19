@@ -5,7 +5,15 @@ description: LLM workflow conventions distilled from production agent/RAG work. 
 
 # Factory LLM workflows
 
-## State — TypedDict, not Pydantic
+Each section leads with **Principle** (one sentence, stack-agnostic), then **Why** (constraint → option → tradeoff), then **Recipe** (the LangGraph / FastAPI / SSE shape we use), and **Failure mode** when there's one to name. Sections that are pure style with no deeper truth are marked `Recipe only`.
+
+## State shape — TypedDict, not Pydantic
+
+**Principle.** LangGraph state is a TypedDict, not Pydantic. The state library's merge semantics dictate the shape.
+
+**Why.** LangGraph merges state between nodes by shallow dict update — the framework expects a dict-like object whose fields are independently updatable. Pydantic validates on construction; every partial update fails validation or requires `.model_copy(update=...)`, which loses the simplicity. TypedDict matches the framework's semantics: it's a dict, fields are optional via `total=False`, the type annotations are documentation that the type checker enforces at call sites.
+
+**Recipe.**
 
 ```py
 from typing import TypedDict
@@ -21,11 +29,17 @@ class ChatState(TypedDict, total=False):
     rag_fallback_attempted: NotRequired[bool]  # one-attempt loop guards
 ```
 
-Why TypedDict over Pydantic / dataclass: LangGraph merges state shallowly between nodes; TypedDict matches that semantics. Nested TypedDicts (`RetrievedChunk`, `EvidenceChunk`, `ClaimVerdict`) for complex types.
+Nested TypedDicts (`RetrievedChunk`, `EvidenceChunk`, `ClaimVerdict`) for complex types.
+
+**Failure mode.** Reaching for Pydantic state because "Pydantic is more rigorous" — every node update became a `.model_copy(update=...)` dance, and the graph wiring drowned in validation noise.
 
 ## Graph composition — node factory closures
 
-Nodes are functions returned by factories that inject dependencies. Separates node logic from graph wiring.
+**Principle.** Nodes are produced by factory functions that close over their dependencies; the graph wires the result.
+
+**Why.** A node that imports its dependencies (LLM client, prompt template, retriever) at module scope is hard to test and impossible to swap. A factory function takes dependencies as parameters and returns a callable; the graph passes the factory the wired-up dependencies. Testing is "construct the node with mocks"; swapping is "construct the node with the alternative."
+
+**Recipe.**
 
 ```py
 def create_router_node(
@@ -46,7 +60,11 @@ graph.add_node("router", create_router_node(llm, ROUTER_PROMPT))
 
 ## Conditional edges — named router functions
 
-Routing logic lives in named functions, not nested conditionals in `add_conditional_edges`:
+**Principle.** Routing logic lives in named functions, not inline conditionals in `add_conditional_edges`.
+
+**Why.** Inline routing logic in the graph builder is unreadable (deeply nested ternaries) and untestable (the graph has to be constructed to test one branch). A named function takes state, returns the next node's name, and is unit-testable in isolation. The graph builder becomes a one-line wire-up.
+
+**Recipe.**
 
 ```py
 def _should_continue_after_router(state: ChatState) -> str:
@@ -63,11 +81,13 @@ graph.add_conditional_edges("router", _should_continue_after_router, {
 })
 ```
 
-Testable, readable, no nesting.
+## Structured output — one JSON schema, two uses
 
-## Structured output — JSON schema dict
+**Principle.** A single JSON schema dict drives both the LLM instruction and the validation contract. Never define two.
 
-For nodes that produce structured output (intent classification, claim extraction):
+**Why.** Defining the LLM tool schema in one place and the validation schema in another guarantees they drift — somebody adds a field to the LLM instruction, forgets the validator, and the validator silently passes outputs that no longer match. One schema, two uses: the LLM gets it as tool definition, the validator gets it as schema. Drift is impossible by construction.
+
+**Recipe.**
 
 ```py
 ROUTER_OUTPUT_SCHEMA = {
@@ -81,9 +101,13 @@ ROUTER_OUTPUT_SCHEMA = {
 }
 ```
 
-This schema doubles as (a) LLM instruction (tool definition) and (b) validation contract (validates the `tool_calls` result). One source of truth — don't define two.
+## Prompts — local string is the truth; remote override is optional
 
-## Prompt patterns — local fallback + optional PromptHub
+**Principle.** The local prompt string is the source of truth; PromptHub (or any remote prompt service) is an optional override.
+
+**Why.** A remote prompt service as the source of truth means offline dev doesn't work, CI can't run without network, and a service outage breaks the whole workflow. Local string as truth, remote as override: offline dev works, CI works, and the override is available when you genuinely want to A/B prompts in production without redeploying.
+
+**Recipe.**
 
 ```py
 ROUTER_PROMPT = """You are an intent classifier...
@@ -101,9 +125,13 @@ async def get_router_prompt(prompt_hub: PromptHub | None) -> str:
     return ROUTER_PROMPT
 ```
 
-PromptHub override is **optional**. Local prompt string is the source of truth so offline dev works.
+## RAG — confidence gating + one-attempt fallback
 
-## RAG — hybrid search, confidence threshold, fallback supplement
+**Principle.** RAG retrieval has a confidence threshold below which it tries one fallback supplement; never retry past one attempt.
+
+**Why.** A retrieval that returns nothing useful is a signal — either the question is out of scope or the index is missing relevant chunks. Trying a broader search once gives the system one more shot before degrading gracefully. Retrying without a guard creates an infinite loop or a runaway cost spike. The `*_attempted` flag in state is the explicit guard.
+
+**Recipe.**
 
 ```py
 async def rag_node(state: ChatState) -> ChatState:
@@ -123,11 +151,15 @@ async def rag_node(state: ChatState) -> ChatState:
     return {"retrieved_chunks": confident_chunks}
 ```
 
-**Fallback supplement RAG** runs at most once (`rag_fallback_attempted: True` flag prevents loops). If first pass returns nothing useful, try a broader search; never retry past one attempt.
+`rag_fallback_attempted: True` flag prevents loops.
 
-## Streaming — SSE with event dispatch
+## Streaming — SSE with a shared event-name registry
 
-Backend (FastAPI) emits typed events:
+**Principle.** Backend and frontend share an event-name registry; names must match exactly.
+
+**Why.** SSE events are stringly-typed by nature — backend emits `"token"`, frontend dispatches on `"token"`. A typo on either side silently drops the event. The fix is a shared constant file (hand-maintained if the languages differ); the LLM workflow has too many events to leave names ad-hoc.
+
+**Recipe.**
 
 ```py
 @router.get("/chat/stream")
@@ -142,8 +174,6 @@ async def chat_stream(request: Request):
     return EventSourceResponse(event_generator())
 ```
 
-Frontend (TypeScript) registers callbacks per event name:
-
 ```ts
 const eventHandlers: Record<string, (data: string) => void> = {
   status: (data) => setStatus(data),
@@ -155,11 +185,15 @@ const eventHandlers: Record<string, (data: string) => void> = {
 };
 ```
 
-**Names must match exactly across backend and frontend.** Use a shared constant module if the polyglot setup allows it (TypeScript codegen from Python is overkill; a hand-maintained const file is fine).
+TypeScript codegen from Python is overkill; a hand-maintained const file is fine.
 
-## Hexagonal ports/adapters — when scale justifies
+## Hexagonal ports/adapters — only when scale justifies
 
-For projects with swappable infra (vector store, storage, chunker, reranker), define `Protocol` interfaces in `domain/ports/`, implementations in `adapters/`. Switch via env at `dependencies.py`:
+**Principle.** Reach for ports/adapters only when you actually need to swap the implementation; don't pre-build the abstraction.
+
+**Why.** Ports/adapters from day one is an abstraction tax paid up front with no benefit. The right time to introduce a `StoragePort` is when there are two concrete storage backends, or one production backend and one local-dev fake. Before that, the interface adds indirection and code without justification.
+
+**Recipe.**
 
 ```py
 def get_storage() -> StoragePort:
@@ -168,11 +202,15 @@ def get_storage() -> StoragePort:
     return FilesystemStorage(settings.local_storage_path)
 ```
 
-Don't reach for ports/adapters from day one — only when you actually need to swap the implementation. Optional ports (`Port | None`) work for things like reranker where the caller checks before use.
+Optional ports (`Port | None`) work for things like reranker where the caller checks before use.
 
-## Multi-tenancy — project-scoped vector store tenants
+## Multi-tenant vector store — per-tenant indexes
 
-Vector store operations take a `project_id` (or `tenant_id`); adapter ensures per-tenant isolation (Weaviate tenant API or equivalent). Never share an index across tenants — RBAC at the app layer is not enough.
+**Principle.** Never share a vector index across tenants; use the vector store's tenant API or one index per tenant.
+
+**Why.** A shared index with app-level RBAC filtering is one missing filter away from cross-tenant retrieval. Vector store tenant APIs (Weaviate, Pinecone namespaces) enforce isolation at the infrastructure layer, where the failure mode is "no results" instead of "wrong tenant's results." The cost of per-tenant isolation is tenant-management overhead; the cost of not is a privacy incident.
+
+**Recipe.**
 
 ```py
 async def search(self, query: str, project_id: str, top_k: int) -> list[Chunk]:
@@ -181,15 +219,15 @@ async def search(self, query: str, project_id: str, top_k: int) -> list[Chunk]:
 
 ## Token-based chunking with overlap
 
-For long-form docs (markdown, PDFs):
-
-- `tiktoken` for token counting
-- Sliding window with `max_token_limit` (e.g. 512) + `token_overlap` (e.g. 50)
-- **Hierarchical markdown chunker** preserves header tree as breadcrumbs; tables and code blocks are atomic (don't split mid-table)
+**Recipe only** — `tiktoken` for counting, sliding window with `max_token_limit` (e.g. 512) + `token_overlap` (e.g. 50), hierarchical markdown chunker preserves header tree as breadcrumbs, tables and code blocks are atomic (don't split mid-table).
 
 ## Lazy DI with `@lru_cache`
 
-Heavy deps (vector store clients, LLM clients, reranker models) imported inside functions to avoid loading during test imports:
+**Principle.** Heavy dependencies (vector store clients, LLM clients, reranker models) load lazily inside functions, not at module import.
+
+**Why.** Module-scope imports of heavy clients mean tests can't import the module without paying the client-construction cost — including any network calls the client makes at construction. Lazy import + `@lru_cache` defers the cost to first call and keeps tests fast.
+
+**Recipe.**
 
 ```py
 @lru_cache
@@ -198,21 +236,15 @@ def get_vector_store() -> VectorStorePort:
     return WeaviateAdapter(...)
 ```
 
-## What NOT to do
+## Version anything editable later
 
-- **Don't use Pydantic state for LangGraph workflows.** Use TypedDict — LangGraph's merge semantics are shallow.
-- **Don't put routing logic inline in `add_conditional_edges`.** Name the router functions (`_should_continue_after_X`); they're testable and readable.
-- **Don't run RAG retries past one fallback attempt.** Set the `*_attempted` flag in state; check it before recursing.
-- **Don't use PromptHub as the source of truth.** Local prompt strings are the fallback that makes offline dev work.
-- **Don't share vector store indexes across tenants.** Use per-tenant indexes — RBAC at app layer is not enough.
-- **Don't define two schemas (LLM instruction + validation).** One JSON schema dict drives both.
-- **Don't reach for ports/adapters from day one.** Only when you actually swap implementations.
+**Principle.** Anything the user might edit later (claims, prompts, generated artifacts) is versioned from day one; retrofitting versioning is expensive.
 
-## Pitfalls referenced
+**Why.** Editing without versioning is destructive — the old value is gone, audit trails are broken, undo is impossible. Versioning is cheap up front: one `version` column or one parent-child link. Retrofitting it means migrating existing rows into a versioned model and rewriting every read.
 
-- **Chat is append-only but claims are versioned** in our reference repo. If message editing becomes a feature, versioning is expensive to retrofit. Version anything that might need editing later.
-- **Triple-fallback auth surface** (Clerk → extension token → header) means three paths to test. Pick one auth provider per surface.
-- **No explicit A/B test infra for chunker / alpha tuning.** Env-driven config is good enough until you have comparison data.
+**Recipe.** Use a `claim_versions` table keyed by `claim_id`; the "current" version is the latest by `created_at` or by an explicit `is_current` flag.
+
+**Failure mode.** Chat messages stored append-only but claims versioned in the same project — the inconsistency meant message editing, when it became a feature, was a full migration.
 
 ## Source patterns
 
