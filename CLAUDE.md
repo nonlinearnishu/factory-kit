@@ -24,10 +24,12 @@ Skills auto-load on the `factory-*` namespace:
 - **factory-forms** — react-hook-form + Zod variants, drawer-CRUD, field registry, conditional visibility
 - **factory-api** — server actions vs tRPC, pagination, error class taxonomy
 - **factory-data-pipelines** — CSV ingestion (Papa Parse), JSONB envelope, three-entry-point Python pattern
+- **factory-testing** — Vitest + Playwright, `__tests__` co-location, provider wrappers, mock factories, coverage thresholds
 - **factory-llm-workflows** — LangGraph TypedDict state, node factories, RAG with confidence gating, SSE streaming
 - **factory-security** — KMS-at-rest, BAA, safe redirects, admin-client guardrails, AI-code risk
 - **factory-observability** — PostHog + Sentry day 1, trace IDs, structured logs, audit logging
 - **factory-deployment** — Vercel + Neon + Cloud Run + Terraform (single-tenant for compliance)
+- **factory-ci** — single `ci.yml` merge gate, ephemeral PR DB, coverage floor, `anthropics/claude-code-action@v1` as required check, branch protection
 - **factory-commits** — Conventional Commits + required Linear issue ID; commitlint config, Husky hook, opencommit wiring
 - **factory-pitfalls** — flat cross-skill index of Failure mode blocks + process-level pitfalls without a skill home
 
