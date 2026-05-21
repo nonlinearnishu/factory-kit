@@ -62,7 +62,7 @@ export function makeFooColumns({
 
 **Principle.** Row actions follow one shape across the app: one primary action plus an overflow menu, tone-aware, with `hidden` for permission-gated items.
 
-**Why.** Without a shared primitive, every table reinvents the same UI: a button here, a kebab menu there, two different "delete" affordances, three different danger styling decisions. A shared primitive collapses this into one component with one set of rules. New tables get the consistent affordance for free; tone and permission gating live where they belong (the primitive).
+**Why.** Without a shared primitive, every table reinvents the same UI: a button here, a kebab menu there, two different "delete" affordances, three different danger styling decisions. A shared primitive collapses this into one component with one set of rules. New tables inherit the consistent affordance by default; tone and permission gating live where they belong (the primitive).
 
 **Recipe.**
 

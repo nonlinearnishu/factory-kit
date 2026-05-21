@@ -116,7 +116,7 @@ sentry_sdk.init(
 
 **Principle.** Every request carries a trace ID; if the caller sent one, propagate it; if not, generate it. Always echo it in the response.
 
-**Why.** Trace IDs lose half their value if they break across service boundaries. A request that hits Next.js → Cloud Run service A → Cloud Run service B should carry the same ID through all three. Regenerating at each hop means the support engineer has three IDs to align manually; propagating means the IDs alignment for free.
+**Why.** Trace IDs lose half their value if they break across service boundaries. A request that hits Next.js → Cloud Run service A → Cloud Run service B should carry the same ID through all three. Regenerating at each hop forces the support engineer to align three IDs by hand; propagating means one ID lines up across all three logs.
 
 **Recipe.**
 

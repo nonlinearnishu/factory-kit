@@ -1,0 +1,49 @@
+{
+  "name": "@nonlinear-labs/factory-kit",
+  "version": "0.1.3",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Claude Code skills, subagents, and slash commands — installed via per-file symlinks into ~/.claude/. The foundation for a software factory.",
+  "type": "module",
+  "bin": {
+    "factory-kit": "bin/factory-kit.js"
+  },
+  "files": [
+    "bin/",
+    "skills/",
+    "agents/",
+    "commands/",
+    "CLAUDE.md",
+    "VERSION",
+    "install.sh",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "version:write": "node -e \"require('fs').writeFileSync('VERSION', require('./package.json').version + '\\n')\""
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai",
+    "agents",
+    "skills",
+    "slash-commands",
+    "software-factory"
+  ],
+  "author": "Nonlinear Labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nonlinearnishu/factory-kit.git"
+  },
+  "homepage": "https://github.com/nonlinearnishu/factory-kit#readme",
+  "bugs": {
+    "url": "https://github.com/nonlinearnishu/factory-kit/issues"
+  }
+}

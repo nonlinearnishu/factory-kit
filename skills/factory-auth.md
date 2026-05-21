@@ -73,7 +73,7 @@ For server actions, the equivalent is the wrapper functions above called at the 
 
 **Principle.** Use the official plugin when one exists; don't write your own auth adapter.
 
-**Why.** The maintenance gradient on auth code is steep — every upstream release brings security fixes, every CVE means tracking patches. The official plugin gets those for free; a custom adapter doesn't. The "we know our needs better than the maintainers" framing reliably costs more than the supposed flexibility saves.
+**Why.** The maintenance gradient on auth code is steep — every upstream release brings security fixes, every CVE means tracking patches. The official plugin absorbs that work; a custom adapter inherits the whole gradient yourself. The "we know our needs better than the maintainers" framing reliably costs more than the supposed flexibility saves.
 
 **Recipe.**
 

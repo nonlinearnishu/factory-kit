@@ -23,7 +23,7 @@ You're starting a focused work session on a single Linear issue. Load its contex
    - **Issue:** `<KEY-N> — title` + priority + current state
    - **Outcome:** one sentence on what "done" observably looks like. If the issue lacks a clear outcome, say so — that's the first thing to fix.
    - **Scope:** the unchecked acceptance criteria / open checkboxes
-   - **Constraints baked in:** anything in the description or comments that locks an approach — name the underlying force (compliance, perf budget, prior decision), not just the rule
+   - **Encoded constraints:** anything in the description or comments that locks an approach — name the underlying force (compliance, perf budget, prior decision), not just the rule
    - **Customer voice:** if user feedback is quoted in the issue or linked, surface the raw words — don't paraphrase
    - **Open design calls:** "decide during build" items worth resolving up front
    - **Context graph:** parent, sub-issues, blockedBy/blocks, linked PRs, design docs — IDs + titles only. This is the issue's place in the wider decision graph; if it looks isolated, flag it as a yellow flag.

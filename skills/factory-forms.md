@@ -20,7 +20,7 @@ Each section leads with **Principle** (one sentence, stack-agnostic), then **Why
 
 **Principle.** Maintain three schema variants per entity: server strict, client lenient, patch partial. Don't try to unify them.
 
-**Why.** Controlled inputs initialize to `''`; the server expects `null` or a valid value. A unified schema accommodates both by sprinkling `.or(z.literal(''))` everywhere, which means the server schema doesn't actually enforce. Three schemas keeps each contract sharp: the server enforces real shape, the client tolerates the input flux, the patch shape is structurally partial (only-what-changed). Cost: more schema. Benefit: each layer's invariants stay enforceable.
+**Why.** HTML inputs in controlled React forms initialize to `''`; the server expects `null` or a valid value. A unified schema accommodates both by sprinkling `.or(z.literal(''))` everywhere, which leaves the server schema enforcing nothing. Three schemas keeps each contract sharp: the server enforces real shape, the client tolerates the input flux, the patch shape is structurally partial (only-what-changed). Cost: more schema. Benefit: each layer's invariants stay enforceable.
 
 **Recipe.**
 

@@ -93,7 +93,7 @@ export function useCreateCustomer() {
 
 **Principle.** Manual registration over automagic discovery.
 
-**Why.** A grep-able surface area beats a clever file-system convention. Every new domain is one diff line that names itself. "Where are all the routers?" answered by reading one file. The cost of one explicit line per domain is trivial; the cost of a clever auto-discovery scheme is one debugging session per onboarding.
+**Why.** A grep-able surface area beats an auto-discovery convention. Every new domain is one diff line that names itself. "Where are all the routers?" answered by reading one file. The cost of one explicit line per domain is trivial; the cost of an implicit auto-discovery scheme is one debugging session per onboarding.
 
 **Recipe.**
 
@@ -131,7 +131,7 @@ See `factory-auth.md` for the middleware shapes.
 
 **Principle.** One Zod schema per mutation; colocate with the router.
 
-**Why.** Mutations diverge in shape long before they look like they will — `create` needs fields `update` doesn't, `update` allows partial input `create` can't. A shared schema with `.optional()` everywhere becomes a parse layer that doesn't actually validate. Per-mutation schemas keep each contract sharp. Colocation means refactoring the mutation refactors the schema in the same diff.
+**Why.** Mutations diverge in shape long before they look like they will — `create` needs fields `update` doesn't, `update` allows partial input `create` can't. A shared schema with `.optional()` everywhere becomes a parse layer that enforces nothing. Per-mutation schemas keep each contract sharp. Colocation means refactoring the mutation refactors the schema in the same diff.
 
 **Recipe.**
 
@@ -162,7 +162,7 @@ Schemas live next to the router, not in a separate file — unless shared with t
 
 **Principle.** Offset pagination by default; cursor only when offset actually breaks.
 
-**Why.** Offset gives jump-to-page-N for free and keeps client state to a single integer. Cursor breaks that affordance, requires more client state, and only pays off past ~100K rows or on append-only feeds. Defaulting to cursor is paying the complexity tax without ever needing the scale.
+**Why.** Offset gives jump-to-page-N at no additional state cost and keeps client state to a single integer. Cursor breaks that affordance, requires more client state, and only pays off past ~100K rows or on append-only feeds. Defaulting to cursor is paying the complexity tax without ever needing the scale.
 
 **Recipe.**
 

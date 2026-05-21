@@ -28,15 +28,26 @@ factory-kit/
 ## Install
 
 ```sh
+npx @nonlinear-labs/factory-kit
+```
+
+That's it. The CLI symlinks all skills, subagents, commands, and the user-level `CLAUDE.md` into `~/.claude/`. Restart Claude Code and the kit auto-loads in every project.
+
+`npx @nonlinear-labs/factory-kit` is idempotent — re-run anytime. Existing files at destinations are skipped with a warning; symlinks pointing into the cached package are refreshed.
+
+### Or install from a local clone
+
+```sh
 # pin to a release (recommended)
-git checkout v0.1.0
+git checkout v0.1.2
 ./install.sh
 
 # or track HEAD (moving edge)
 git checkout main
 ./install.sh
 ```
-`install.sh` is idempotent — re-run after pulling. Existing files at destinations are skipped with a warning; symlinks pointing into this repo are refreshed.
+
+The shell installer and the npx CLI do the same thing; pick whichever fits the workflow.
 
 ## What's in here
 

@@ -30,7 +30,7 @@ You're giving the user a dev-standup view of their open Linear work in this proj
 
    **Blocked** *(only if any)* — issues with open `blockedBy`. Show what's blocking each.
 
-   **One-line recommendation:** the single best issue to pick up next, given priority and blockers. Be opinionated. Cite as `/entry <TEAM-N>`.
+   **One-line recommendation:** the single best issue to pick up next, given priority and blockers. Cite as `/entry <TEAM-N>`.
 
 ## Style
 
