@@ -39,7 +39,7 @@ That's it. The CLI symlinks all skills, subagents, commands, and the user-level 
 
 ```sh
 # pin to a release (recommended)
-git checkout v0.1.2
+git checkout v0.1.3
 ./install.sh
 
 # or track HEAD (moving edge)
@@ -57,17 +57,21 @@ Synthesized cross-build conventions. Auto-loaded by Claude Code from `~/.claude/
 
 | Skill | Domain |
 |---|---|
+| `factory-voice` | Architect voice, first-principles framing, structured shape for Linear / PR / commit prose (loaded every session) |
 | `factory-stack` | Locked + flexible stack decisions, decision criteria |
 | `factory-frontend` | DataTable + drawer-CRUD, RowActions, formatters, Mantine vs shadcn |
+| `factory-design` | Semantic token vocabulary, CSS-var + Tailwind bridge, dark/light as variable swap, primitives as token consumers, vocabulary-sprawl failure mode |
 | `factory-auth` | Better Auth + orgs primary, RLS/Clerk criteria, wrapper interface |
 | `factory-data-layer` | Drizzle schema partitioning, multi-tenancy keys, timestamps helper |
 | `factory-forms` | react-hook-form + Zod variants, field registry, masked inputs |
 | `factory-api` | Server actions vs tRPC criteria; validation; error shape |
 | `factory-data-pipelines` | CSV imports, time-series envelopes, Python service entry points |
+| `factory-testing` | Vitest + Playwright, `__tests__` co-location, provider wrappers, mock factories, coverage thresholds |
 | `factory-llm-workflows` | LangGraph TypedDict state, node factories, RAG, SSE streaming |
 | `factory-security` | KMS-at-rest, BAA/PHI, safe redirects, AI-code risk |
 | `factory-observability` | PostHog + Sentry day 1, activity logging, trace IDs |
 | `factory-deployment` | Vercel + Cloud Run + Terraform conventions |
+| `factory-ci` | Single `ci.yml` merge gate, ephemeral PR DB, coverage floor, Claude Code reviewer as required check |
 | `factory-commits` | Conventional Commits + required Linear-ID; commitlint config |
 | `factory-pitfalls` | Flat cross-skill index of Failure mode blocks + process-level pitfalls without a skill home |
 
@@ -97,6 +101,7 @@ Linear ticket workflow — project-agnostic. Each project that wants these runs 
 - `/entry <issue>` — load a Linear issue into context and enter plan mode
 - `/submit [issue]` — move ticket to "In Review" (auto-detects from branch)
 - `/close [issue]` — closing comment + Done + delete local branch / exit worktree
+- `/release patch|minor|major` — bump VERSION, commit, tag with auto-generated notes (edited in Cursor), push after confirmation
 
 Branch convention: any branch containing `<teamkey>-<num>` parses out (e.g. `nishu/non-45-topic` → `NON-45`).
 

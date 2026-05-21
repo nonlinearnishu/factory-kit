@@ -103,11 +103,13 @@ export const formatPercent = (n: number) => /* ... */;              // expects 0
 
 ## Semantic colors — never raw palette names
 
-**Principle.** Use semantic tokens (`success` / `warning` / `danger` / `info` / `neutral`); never raw palette names.
+**Recipe only** — the full design-system discipline lives in `factory-design.md` (token vocabulary, CSS-var + Tailwind bridge, dark/light as a variable swap, primitives as token consumers, vocabulary-sprawl failure mode). Read it before scaffolding a new UI surface.
 
-**Why.** Raw color names (`red`, `blue`, `green`) couple every consumer to the palette. A theme tweak — slightly different green for success, slightly different red for danger — means search-and-replace across the codebase. Semantic tokens decouple the meaning from the color; "this is danger" stays correct when the danger color changes.
+For status-tone use specifically inside CRUD surfaces:
 
-**Recipe.** Default badges to `neutral`; reserve one accent for the operationally-meaningful state per surface. Disambiguate via variant (filled / light / outline), not hue.
+- Use semantic state tokens (`success` / `warning` / `danger` / `info` / `neutral`); never raw palette names (`red`, `blue`, `green`).
+- Default badges to `neutral`; reserve one accent for the operationally-meaningful state per surface.
+- Disambiguate via variant (filled / light / outline), not hue.
 
 ## Query keys — strict 2-segment prefix
 

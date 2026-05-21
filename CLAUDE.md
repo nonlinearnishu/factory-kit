@@ -19,6 +19,7 @@ Skills auto-load on the `factory-*` namespace:
 - **factory-voice** — architect voice, first-principles framing, structured shape for Linear/PR/commit prose (loaded every session)
 - **factory-stack** — locked stack + decision criteria (read at project kickoff)
 - **factory-frontend** — DataTable + drawer-CRUD, RowActions, format helpers, semantic colors
+- **factory-design** — semantic token vocabulary, CSS-var + Tailwind bridge, dark/light as variable swap, primitives as token consumers, vocabulary-sprawl failure mode
 - **factory-auth** — provider pick, unified `requireAuth`/`requireRole`/`withOrgContext` wrapper
 - **factory-data-layer** — Drizzle schema partitioning, multi-tenancy, JSONB envelope, polymorphic tables
 - **factory-forms** — react-hook-form + Zod variants, drawer-CRUD, field registry, conditional visibility

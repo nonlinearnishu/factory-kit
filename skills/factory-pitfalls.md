@@ -41,6 +41,17 @@ Each entry: one line, pointing at the skill section that owns it.
 - **Two-way state-DB sync** — `factory-frontend.md §One direction of truth`
 - **Currency formatting drift across views** — `factory-frontend.md §Format helpers`
 
+### Design system
+
+- **Palette-position token names (`primary` / `base-100`)** — `factory-design.md §Token vocabulary — name intent, not palette position`
+- **Hex literal in a component file** — `factory-design.md §Token source — CSS variables, bridged into Tailwind`
+- **`dark:` variants sprinkled on individual elements** — `factory-design.md §Mode is a variable swap, not a parallel palette`
+- **Spacing tokens (`--space-section-y-md`) that duplicate Tailwind's scale** — `factory-design.md §What gets a token, what stays a utility`
+- **Components referencing primitive-layer names (`bg-blue-500`) instead of semantic** — `factory-design.md §One layer or two`
+- **"I'll lift this later" inline component** — `factory-design.md §Promote drift into a primitive`
+- **Token sprawl (60+ tokens, role names diluted into palette-noise)** — `factory-design.md §Hold the line on vocabulary size`
+- **Half-replaced theme library coexisting with new tokens** — `factory-design.md §When the existing surface is daisyUI / Bootstrap / Material`
+
 ### Data
 
 - **Querying inside JSONB at app speed** — `factory-data-layer.md §Custom attributes as JSONB`
