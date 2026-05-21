@@ -3,5 +3,6 @@
 *.swo
 .vscode/
 .idea/
+.claude/
 node_modules/
 *.tgz
