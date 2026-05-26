@@ -68,6 +68,7 @@ Synthesized cross-build conventions. Auto-loaded by Claude Code from `~/.claude/
 | `factory-data-pipelines` | CSV imports, time-series envelopes, Python service entry points |
 | `factory-testing` | Vitest + Playwright, `__tests__` co-location, provider wrappers, mock factories, coverage thresholds |
 | `factory-llm-workflows` | LangGraph TypedDict state, node factories, RAG, SSE streaming |
+| `factory-prompting` | XML-tag prompt vocabulary, minimum-tagging discipline, tag-sprawl failure mode. Paired with `/prompt` |
 | `factory-security` | KMS-at-rest, BAA/PHI, safe redirects, AI-code risk |
 | `factory-observability` | PostHog + Sentry day 1, activity logging, trace IDs |
 | `factory-deployment` | Vercel + Cloud Run + Terraform conventions |
@@ -104,6 +105,10 @@ Linear ticket workflow — project-agnostic. Each project that wants these runs 
 - `/release patch|minor|major` — bump VERSION, commit, tag with auto-generated notes (edited in Cursor), push after confirmation
 
 Branch convention: any branch containing `<teamkey>-<num>` parses out (e.g. `nishu/non-45-topic` → `NON-45`).
+
+Prompt authoring — no project config needed.
+
+- `/prompt <rough ask>` — convert a messy one-liner into a structured XML-tagged prompt using the `factory-prompting.md` vocabulary
 
 ### User-level `CLAUDE.md`
 

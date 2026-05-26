@@ -27,6 +27,7 @@ Skills auto-load on the `factory-*` namespace:
 - **factory-data-pipelines** — CSV ingestion (Papa Parse), JSONB envelope, three-entry-point Python pattern
 - **factory-testing** — Vitest + Playwright, `__tests__` co-location, provider wrappers, mock factories, coverage thresholds
 - **factory-llm-workflows** — LangGraph TypedDict state, node factories, RAG with confidence gating, SSE streaming
+- **factory-prompting** — XML-tag prompt vocabulary (`instructions`, `context`, `input`, `output_format`, `examples`, `constraints`, `role`, `thinking`), minimum-tagging rule, tag-sprawl failure mode
 - **factory-security** — KMS-at-rest, BAA, safe redirects, admin-client guardrails, AI-code risk
 - **factory-observability** — PostHog + Sentry day 1, trace IDs, structured logs, audit logging
 - **factory-deployment** — Vercel + Neon + Cloud Run + Terraform (single-tenant for compliance)
@@ -60,6 +61,10 @@ Linear ticket workflow — universal, project-agnostic. Each project that wants 
 - **/release `patch|minor|major`** — bump VERSION, commit, tag with auto-generated notes (edited in Cursor), push after confirmation
 
 Branch convention assumed by `/submit` and `/close`: any branch containing `<teamkey>-<num>` (case-insensitive) — e.g., `nishu/non-45-topic` → `NON-45`.
+
+Prompt authoring — project-agnostic, no config needed.
+
+- **/prompt `<rough ask>`** — rewrite a rough one-liner or paragraph into the structured XML-tagged form using the `factory-prompting.md` vocabulary
 
 ## Per-project decisions
 
