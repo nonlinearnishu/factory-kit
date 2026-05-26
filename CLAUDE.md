@@ -66,9 +66,24 @@ Prompt authoring — project-agnostic, no config needed.
 
 - **/prompt `<rough ask>`** — rewrite a rough one-liner or paragraph into the structured XML-tagged form using the `factory-prompting.md` vocabulary
 
+Kit diagnostics — no config needed.
+
+- **/kit-audit** — measure the factory-kit's token footprint (baseline vs on-demand, heaviest assets, trim candidates)
+
 ## Per-project decisions
 
 Each new project should have a `DECISIONS.md` (or short section in its `CLAUDE.md`) declaring its picks from `factory-stack.md`'s decision-criteria choices: component library (Mantine vs shadcn), API style (server actions vs tRPC), auth provider, ORM, deployment target. Default to the kit's primary recommendation if not stated.
+
+## Roadmap — GitHub issues, label `roadmap`
+
+Future-release ideas for the kit itself live as GitHub issues with the `roadmap` label, not in a stray `ROADMAP.md`. Same gesture as `/release`: GitHub is the system of record. Browse via `gh issue list --label roadmap --state open` or [github.com/nonlinearnishu/factory-kit/issues?q=label:roadmap](https://github.com/nonlinearnishu/factory-kit/issues?q=label%3Aroadmap).
+
+Issue body shape: **What** / **Why** / **Build trigger** / **Shape**. The build trigger is the evidence that justifies starting — promote in response to use, not anticipation. Roadmap issues that sit untouched for ≥6 months without a triggering event get closed as `wontfix`; no evidence is its own evidence.
+
+To promote an issue to ship:
+1. Open a PR that implements it, referencing `Closes #N` in the body — issue auto-closes on merge.
+2. Bump VERSION (minor for new capability, patch for extension).
+3. Reference the issue in release notes — preserves the *why* alongside the *what*.
 
 ## What the kit does NOT decide
 

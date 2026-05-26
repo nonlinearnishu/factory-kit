@@ -110,6 +110,10 @@ Prompt authoring — no project config needed.
 
 - `/prompt <rough ask>` — convert a messy one-liner into a structured XML-tagged prompt using the `factory-prompting.md` vocabulary
 
+Kit diagnostics — no project config needed.
+
+- `/kit-audit` — measure the kit's token footprint (baseline vs on-demand, heaviest assets, trim candidates)
+
 ### User-level `CLAUDE.md`
 
 `CLAUDE.md` in this repo is symlinked to `~/.claude/CLAUDE.md` and listed by Claude Code on every project. Per-project decisions still live in each project's own `CLAUDE.md` or `DECISIONS.md`.
