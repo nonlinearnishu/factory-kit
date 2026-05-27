@@ -39,7 +39,7 @@ That's it. The CLI symlinks all skills, subagents, commands, and the user-level 
 
 ```sh
 # pin to a release (recommended)
-git checkout v0.1.3
+git checkout v0.1.5
 ./install.sh
 
 # or track HEAD (moving edge)
