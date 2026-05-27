@@ -18,7 +18,7 @@ Each `factory-*.md` skill leads each section with the **Principle** (one sentenc
 factory-kit/
 ├── skills/                # synthesized factory-*.md docs, auto-loaded as ~/.claude/skills/
 ├── agents/                # specialist subagents, callable via the Agent tool
-├── commands/              # slash commands (/standup, /entry, /submit, /close, /setup-linear)
+├── commands/              # slash commands (/standup, /entry, /submit, /close, /release, /setup-linear, /prompt, /kit-audit)
 ├── CLAUDE.md              # user-level header listing the rosters above
 ├── commitlint.config.cjs  # kit's own commitlint (Conventional Commits, no Linear-ID rule)
 ├── VERSION
@@ -63,6 +63,7 @@ Synthesized cross-build conventions. Auto-loaded by Claude Code from `~/.claude/
 | `factory-design` | Semantic token vocabulary, CSS-var + Tailwind bridge, dark/light as variable swap, primitives as token consumers, vocabulary-sprawl failure mode |
 | `factory-auth` | Better Auth + orgs primary, RLS/Clerk criteria, wrapper interface |
 | `factory-data-layer` | Drizzle schema partitioning, multi-tenancy keys, timestamps helper |
+| `factory-db-migration` | Destructive prod-write runbook: preflight/mutate/verify/rollback, idempotency by natural key, Layer C backup independence, human-gated execution |
 | `factory-forms` | react-hook-form + Zod variants, field registry, masked inputs |
 | `factory-api` | Server actions vs tRPC criteria; validation; error shape |
 | `factory-data-pipelines` | CSV imports, time-series envelopes, Python service entry points |
@@ -85,6 +86,7 @@ Each is a Claude Code subagent file (YAML frontmatter + markdown body). Callable
 | `feature-architect` | Scope a vague client ask into a buildable feature spec; routes to the right specialists |
 | `frontend-engineer` | UI scaffolding, CRUD surfaces, component-library decisions |
 | `db-schema-architect` | Drizzle schemas, migrations, multi-tenancy keys |
+| `db-migration-engineer` | Destructive prod-write runbook discipline; sister to `db-schema-architect` — owns preflight/mutate/verify/rollback, idempotency proof, Layer C snapshot gating |
 | `auth-wiring-specialist` | Auth provider setup, RBAC, org context |
 | `forms-builder` | Multi-step forms, field registry, conditional visibility |
 | `api-route-engineer` | Endpoints, validation, error responses, pagination |
