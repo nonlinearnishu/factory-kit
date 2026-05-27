@@ -58,6 +58,20 @@ Each entry: one line, pointing at the skill section that owns it.
 - **Raw SQL with hand-mapped row→object** — `factory-data-layer.md §ORM pick`
 - **Mixed migration-file naming** — `factory-data-layer.md §Migration file naming`
 
+### Database migrations (destructive prod writes)
+
+- **Silently coercing historical data to fit a wrong constraint** — `factory-db-migration.md §The data is ground truth`
+- **Single-file migration mixing preflight + mutate + verify** — `factory-db-migration.md §Three-stage write contract`
+- **Untested rollback shipped to prod** — `factory-db-migration.md §Three-stage write contract`
+- **Idempotency claim asserted in a comment, not proven by re-run** — `factory-db-migration.md §Idempotency via natural keys`
+- **Natural key with bare `=` on nullable columns** — `factory-db-migration.md §Idempotency via natural keys`
+- **Two-branch CASE that conflates NULL with FALSE in tri-state UPDATE** — `factory-db-migration.md §Bidirectional update semantics`
+- **Constraint error with no row index — parser didn't validate** — `factory-db-migration.md §Validate at parse, not at constraint`
+- **Prod destructive write with no Layer C snapshot taken** — `factory-db-migration.md §Layered backup independence`
+- **LLM auto-runs runbook commands "because they're safe"** — `factory-db-migration.md §Human gate at every step`
+- **Constraint dropped without auditing downstream layers (server actions, RPC filters, dashboard rollups)** — `factory-db-migration.md §Defense in depth`
+- **Local-cycle-then-prod, skipping ephemeral staging** — `factory-db-migration.md §Migration testing protocol`
+
 ### Pipelines
 
 - **Pre-built `libs/py-libs/` before second consumer** — `factory-data-pipelines.md §Don't pre-build shared libs`

@@ -22,6 +22,7 @@ Skills auto-load on the `factory-*` namespace:
 - **factory-design** — semantic token vocabulary, CSS-var + Tailwind bridge, dark/light as variable swap, primitives as token consumers, vocabulary-sprawl failure mode
 - **factory-auth** — provider pick, unified `requireAuth`/`requireRole`/`withOrgContext` wrapper
 - **factory-data-layer** — Drizzle schema partitioning, multi-tenancy, JSONB envelope, polymorphic tables
+- **factory-db-migration** — destructive prod-write runbook discipline: three-stage write contract (preflight/mutate/verify/rollback), idempotency by natural key, layered backup independence (Layer C), bidirectional update semantics, validation-at-parse, human-gated execution
 - **factory-forms** — react-hook-form + Zod variants, drawer-CRUD, field registry, conditional visibility
 - **factory-api** — server actions vs tRPC, pagination, error class taxonomy
 - **factory-data-pipelines** — CSV ingestion (Papa Parse), JSONB envelope, three-entry-point Python pattern
@@ -40,6 +41,7 @@ Skills auto-load on the `factory-*` namespace:
 - **feature-architect** — turns vague client asks into buildable specs; routes to other agents
 - **frontend-engineer** — UI surfaces, CRUD scaffolding, drawer-CRUD
 - **db-schema-architect** — schema design, migrations, multi-tenancy keys
+- **db-migration-engineer** — destructive prod-write runbook: preflight/mutate/verify/rollback, idempotency proof, Layer C snapshot gating, human-gated execution. Sister to `db-schema-architect`
 - **auth-wiring-specialist** — auth provider setup, RBAC, org context
 - **forms-builder** — multi-step forms, field registry, conditional visibility
 - **api-route-engineer** — endpoints, validation, pagination, error shape
