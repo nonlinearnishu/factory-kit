@@ -78,7 +78,7 @@ Each new project should have a `DECISIONS.md` (or short section in its `CLAUDE.m
 
 ## Roadmap — GitHub issues, label `roadmap`
 
-Future-release ideas for the kit itself live as GitHub issues with the `roadmap` label, not in a stray `ROADMAP.md`. Same gesture as `/release`: GitHub is the system of record. Browse via `gh issue list --label roadmap --state open` or [github.com/nonlinearnishu/factory-kit/issues?q=label:roadmap](https://github.com/nonlinearnishu/factory-kit/issues?q=label%3Aroadmap).
+Future-release ideas for the kit itself live as GitHub issues with the `roadmap` label, not in a stray `ROADMAP.md`. Same gesture as `/release`: GitHub is the system of record. Browse via `gh issue list --label roadmap --state open` or [github.com/nonlinear-xyz/factory-kit/issues?q=label:roadmap](https://github.com/nonlinear-xyz/factory-kit/issues?q=label%3Aroadmap).
 
 Issue body shape: **What** / **Why** / **Build trigger** / **Shape**. The build trigger is the evidence that justifies starting — promote in response to use, not anticipation. Roadmap issues that sit untouched for ≥6 months without a triggering event get closed as `wontfix`; no evidence is its own evidence.
 
