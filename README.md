@@ -132,8 +132,8 @@ The "API surface" is skill filenames + frontmatter, agent filenames + `subagent_
 
 ## Building in public
 
-- [Releases](https://github.com/nonlinearnishu/factory-kit/releases) — the changelog
-- [Discussions](https://github.com/nonlinearnishu/factory-kit/discussions) — design questions in the open
+- [Releases](https://github.com/nonlinear-xyz/factory-kit/releases) — the changelog
+- [Discussions](https://github.com/nonlinear-xyz/factory-kit/discussions) — design questions in the open
 - Twitter/X: [@nishu_lahoti](https://x.com/nishu_lahoti) — short threads per minor tag
 
 ## License

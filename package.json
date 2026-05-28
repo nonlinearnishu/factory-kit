@@ -40,10 +40,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nonlinearnishu/factory-kit.git"
+    "url": "git+https://github.com/nonlinear-xyz/factory-kit.git"
   },
-  "homepage": "https://github.com/nonlinearnishu/factory-kit#readme",
+  "homepage": "https://github.com/nonlinear-xyz/factory-kit#readme",
   "bugs": {
-    "url": "https://github.com/nonlinearnishu/factory-kit/issues"
+    "url": "https://github.com/nonlinear-xyz/factory-kit/issues"
   }
 }
