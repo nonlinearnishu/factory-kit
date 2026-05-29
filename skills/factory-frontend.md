@@ -213,6 +213,31 @@ If the project has a marketing site and an app, default to shadcn for both. If a
 
 **Failure mode.** Fleet-advisor's `RouteContext` + auto-persist hook — the client reducer and DB persistence desynced under concurrent edits, lost user changes silently.
 
+## Source of truth — DOM-owned vs React-owned
+
+**Principle.** Every mutable value has one authoritative home — the DOM node or React's render tree. Decide per *value*, not per form: a value that feeds a live-derived view (a running total, inline validation, a conditional field) belongs in React's tree; a write-mostly value that only matters at submit can stay DOM-owned.
+
+**Why.** Model form state as a dependency graph: `quantity → lineTotal → subtotal`. React-owned state (controlled inputs) keeps the whole graph live — mutate a leaf and every derived node recomputes, paid for with a re-render per keystroke. DOM-owned state (uncontrolled inputs) cuts the graph at the leaf: the value lives in the input/ref, outside React's reach, so each derived node needs an explicit edge — a subscription — re-drawn by hand or it silently goes stale. "Controlled vs uncontrolled" is just the framework's name for which home you picked. The danger of uncontrolled is that a missing edge is *silent*: no error, the derived value just stops tracking, and unrelated re-renders make it look intermittently fine — which reads as a clamp or a cap and sends you debugging the wrong thing. The tell for ownership: if something on screen is a function of a value and must update as the user types, that value wants to be in React's tree.
+
+**Recipe.** Hybrid is usually the right answer — keep write-mostly fields DOM-owned for snappy typing, make the derived subtree React-owned. In Mantine uncontrolled forms, don't read `form.getValues()` in render for display; route it through a subscribe-on-access hook so the read *is* the subscription and the edge can't be forgotten:
+
+```ts
+// reads the value AND subscribes the caller to its changes
+export function useReactiveValues<T = unknown>(
+  form: UseFormReturnType<any>,
+  path: string,
+): T {
+  const [, bump] = useState(0);
+  const onChange = useCallback(() => bump((n) => n + 1), []); // stable: no re-subscribe per render
+  form.watch(path, onChange); // fires for nested edits + add/remove under `path`
+  return (form.getValues() as Record<string, unknown>)[path] as T;
+}
+```
+
+Rule: `getValues()` is for event handlers and submit only — never a render-for-display read. `form.watch` alone doesn't fix a stale total — its callback fires but doesn't re-render, so it must be paired with a state bump (which the hook hides). A *precise* lint rule ("`getValues()` in render scope") needs a custom AST rule; until then the hook is the enforcement — make the right path the only ergonomic one.
+
+**Failure mode.** The severed edge — a derived value (line total, subtotal) computed from `getValues()` in render under an uncontrolled form. It updates only on incidental re-renders, so it looks intermittently correct and presents as a cap/clamp, which delays diagnosis. Kairos KAI-148: line totals froze at the last incidental render ("stuck at $2,700"); the fix was `useReactiveValues`, not a switch to controlled mode — the whole-form re-render and the controlled-`NumberInput` cursor quirks weren't worth buying a structural guarantee the user never sees.
+
 ## DataTable cell-edit vs drawer — different tools
 
 **Principle.** Inline cell-edit is for fast bulk edits; drawer is for single-row, multi-field, validated edits.
@@ -223,4 +248,4 @@ If the project has a marketing site and an app, default to shadcn for both. If a
 
 ## Source patterns
 
-Drawn from kairos (DataTable, RowActions, drawer mode unions, format helpers, heading tiers, semantic colors, query-key naming, Providers pattern, cross-feature import ban), duezy (Mantine theme + semantic colors), fleet-advisor (shadcn + Mantine variants, conditional query enabling), ford-analysis (shadcn + Context-driven selection state).
+Drawn from kairos (DataTable, RowActions, drawer mode unions, format helpers, heading tiers, semantic colors, query-key naming, Providers pattern, cross-feature import ban, `useReactiveValues` / DOM-vs-React state ownership — KAI-148), duezy (Mantine theme + semantic colors), fleet-advisor (shadcn + Mantine variants, conditional query enabling), ford-analysis (shadcn + Context-driven selection state).
