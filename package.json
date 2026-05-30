@@ -7,10 +7,12 @@
   "description": "Claude Code skills, subagents, and slash commands — installed via per-file symlinks into ~/.claude/. The foundation for a software factory.",
   "type": "module",
   "bin": {
-    "factory-kit": "bin/factory-kit.js"
+    "factory-kit": "bin/factory-kit.js",
+    "factory-kit-check": "bin/factory-kit-check.js"
   },
   "files": [
     "bin/",
+    "dist/",
     "skills/",
     "agents/",
     "commands/",
@@ -24,7 +26,22 @@
     "node": ">=18"
   },
   "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build",
     "version:write": "node -e \"require('fs').writeFileSync('VERSION', require('./package.json').version + '\\n')\""
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.2",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   },
   "keywords": [
     "claude",
