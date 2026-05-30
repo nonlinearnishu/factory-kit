@@ -19,6 +19,8 @@ factory-kit/
 ├── skills/                # synthesized factory-*.md docs, auto-loaded as ~/.claude/skills/
 ├── agents/                # specialist subagents, callable via the Agent tool
 ├── commands/              # slash commands (/standup, /entry, /submit, /close, /release, /setup-linear, /prompt, /kit-audit)
+├── check/                 # factory-kit-check — deterministic rule engine (TS source)
+├── bin/                   # factory-kit (installer) + factory-kit-check (the checker)
 ├── CLAUDE.md              # user-level header listing the rosters above
 ├── commitlint.config.cjs  # kit's own commitlint (Conventional Commits, no Linear-ID rule)
 ├── VERSION
@@ -48,6 +50,50 @@ git checkout main
 ```
 
 The shell installer and the npx CLI do the same thing; pick whichever fits the workflow.
+
+## factory-kit-check — enforce the standard
+
+The skills *describe* the conventions. `factory-kit-check` *enforces* a deterministic subset of them. Point it at a repo; it walks the code, runs a rule set, and prints findings — each one citing the `factory-pitfalls.md` entry it violates.
+
+```sh
+factory-kit-check                 # check the current directory
+factory-kit-check ../some-repo    # check another repo
+```
+
+It is **read-only** — it reads and judges, it never writes to your code. It exits non-zero on any `critical`/`high` finding, so it drops straight into a pre-push hook or CI step.
+
+Why deterministic (not an LLM): the rules are cheap, reproducible, and cost nothing per run, so you can run them on every save without thinking about it. Each rule is greppable code with a documented heuristic and a citation — no black box.
+
+### Rules (v0)
+
+| Rule | Severity | Cites |
+|---|---|---|
+| `admin-client-module-scope` | critical | `factory-auth.md §Admin client — always wrapped` |
+| `hardcoded-email-allowlist` | critical | `factory-auth.md §Hardcoded email allowlists` |
+| `public-procedure-mutation` | critical | `factory-auth.md §Auth from day one` |
+| `update-delete-no-where` | critical | `factory-data-layer.md §ORM pick` |
+| `in-memory-rate-limiter` | high | `factory-security.md §Rate limiting` |
+| `mixed-trpc-server-actions` | high | `factory-api.md §API style — pick one` |
+
+Detection is regex/line-heuristic in v0 — precision-first, tuned against real repos. Rules are language-tagged (TS today; the seam for a Python `ast` sidecar is in place) and the report footer lists how many known pitfalls are not yet covered, so the tool never implies full coverage.
+
+### Configure
+
+Drop a `.factory-check.json` in the repo to disable a rule:
+
+```json
+{ "disabledRules": ["update-delete-no-where"] }
+```
+
+The report prints how many rules are disabled. If you find yourself disabling more than a handful, the rule design is wrong — open an issue, don't paper over it.
+
+### From source
+
+```sh
+npm install && npm run build   # builds dist/ via tsup
+npm test                       # vitest, with a coverage floor
+node bin/factory-kit-check.js .
+```
 
 ## What's in here
 
